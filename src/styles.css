@@ -87,7 +87,7 @@ tr.eu td{background:#151306}
 .placar input{width:64px;height:64px;font-size:30px;text-align:center;background:var(--preto3);border:1px solid var(--linha);border-radius:12px;color:var(--txt);font-weight:800}
 .placar span{color:var(--mudo);font-size:18px}
 .placar .lb{display:flex;flex-direction:column;align-items:center;gap:6px}
-pre.msg{white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.5;background:#0e1a12;border:1px solid #1e3526;border-radius:12px;padding:14px;margin-bottom:10px}
+pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:inherit;font-size:14px;line-height:1.5;background:#0e1a12;border:1px solid #1e3526;border-radius:12px;padding:14px;margin-bottom:10px}
 input.txt,select.txt{width:100%;background:var(--preto3);border:1px solid var(--linha);border-radius:10px;padding:11px 12px;color:var(--txt);font-size:15px;margin-bottom:10px}
 label.lb{display:block;color:var(--mudo);font-size:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
 .fab{position:fixed;bottom:76px;right:calc(50% - 215px + 16px);width:52px;height:52px;border-radius:50%;background:var(--bege);color:#111;font-size:30px;border:0;box-shadow:0 6px 20px rgba(0,0,0,.6);cursor:pointer;line-height:0}
