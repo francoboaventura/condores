@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Modal, useToast } from './ui'
-import { ddmm, resultado, pontos, RES_NOME, nomeVencedor } from './lib/util'
+import { ddmm, pontos, RES_NOME, nomeVencedor, temPlacar } from './lib/util'
 import * as db from './lib/dados'
 
 export default function Ranking({ atletas, meuNome, irParaMsg }) {
@@ -78,7 +78,7 @@ export default function Ranking({ atletas, meuNome, irParaMsg }) {
                 <div className={`item ${aberta === r.id ? 'aberto' : ''}`} onClick={() => setAberta(aberta === r.id ? null : r.id)} style={{ cursor: 'pointer' }}>
                   <div className="av">{encerradas.length - i}</div>
                   <div className="nome">Seg {ddmm(r.data)}<span className="sub">{r.cond_escalacoes.filter((e) => e.atleta_id).length} atletas · {nomeVencedor(r)}</span></div>
-                  <span className="tag preto">{r.gols_preto}</span><span className="tag bege">{r.gols_bege}</span>
+                  {temPlacar(r) ? <><span className="tag preto">{r.gols_preto}</span><span className="tag bege">{r.gols_bege}</span></> : <span className="tag">{r.vencedor === 'P' ? '⚫' : r.vencedor === 'B' ? '🟡' : '='}</span>}
                 </div>
                 <div className="hist-det"><b>⚫ Preto:</b> {nomesTime(r, 'P')}<br /><b>🟡 Bege:</b> {nomesTime(r, 'B')}</div>
               </div>

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useToast } from './ui'
-import { ini, ddmm, nomeVencedor } from './lib/util'
+import { ini, ddmm, nomeVencedor, temPlacar, proximaSegunda, fora } from './lib/util'
 import * as db from './lib/dados'
 
-export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
+export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irParaRanking }) {
   const toast = useToast()
   const [passo, setPasso] = useState(1)
   const [rodada, setRodada] = useState(null)
@@ -16,19 +16,36 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
   const [encerradas, setEncerradas] = useState([])
   const [editando, setEditando] = useState(null) // rodada encerrada em correção
   const [carregando, setCarregando] = useState(true)
+  const [aLancar, setALancar] = useState([])      // rodadas antigas sem resultado
+  const [escolher, setEscolher] = useState(false) // modal de escolha de rodada
+  const [outraData, setOutraData] = useState('')
+  const [rodadaId, setRodadaId] = useState(null)  // null = próxima segunda
 
   const fechada = rodada?.status === 'encerrada'
+  const passada = rodada && rodada.data < proximaSegunda()
+  const podeEditar = diretor && !fechada
 
-  async function carregar() {
+  async function carregar(id = rodadaId) {
     try {
-      const r = await db.rodadaAtual()
+      const r = id ? await db.rodadaPorId(id) : await db.rodadaAtual()
       setRodada(r)
-      const [c, e, enc] = await Promise.all([db.listarConfirmacoes(r.id), db.listarEscalacao(r.id), db.listarRodadasEncerradas()])
-      setConf(c); setEsc(e); setEncerradas(enc)
-      if (r.gols_preto != null) { setGp(String(r.gols_preto)); setGb(String(r.gols_bege)) }
+      const [c, e, enc, al] = await Promise.all([db.listarConfirmacoes(r.id), db.listarEscalacao(r.id), db.listarRodadasEncerradas(), diretor ? db.listarRodadasALancar() : []])
+      setConf(c); setEsc(e); setEncerradas(enc); setALancar(al)
+      setGp(r.gols_preto != null ? String(r.gols_preto) : ''); setGb(r.gols_bege != null ? String(r.gols_bege) : '')
     } catch (err) { toast(err.message) } finally { setCarregando(false) }
   }
   useEffect(() => { carregar() }, [])
+
+  async function trocarRodada(id) {
+    setEscolher(false); setRodadaId(id); setConvBanco([]); setPasso(id ? 2 : 1)
+    await carregar(id)
+  }
+  async function abrirOutraData() {
+    if (!outraData) return
+    const d = new Date(outraData + 'T12:00:00')
+    if (d.getDay() !== 1) return toast('Escolha uma segunda-feira')
+    try { const r = await db.rodadaPorData(outraData); await trocarRodada(r.id) } catch (e) { toast(e.message) }
+  }
 
   const run = async (fn, okMsg) => {
     try { await fn(); await carregar(); if (okMsg) toast(okMsg) } catch (e) { toast(e.message) }
@@ -36,14 +53,16 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
 
   // ---------- confirmações ----------
   const statusDe = (id) => conf.find((c) => c.atleta_id === id)?.status
-  const ativos = atletas.filter((a) => !a.dm)
+  const ativos = atletas.filter((a) => !fora(a))
   const sim = conf.filter((c) => c.status === 'S').map((c) => c.atleta_id)
   const nao = conf.filter((c) => c.status === 'N').length
   const pend = ativos.length - sim.length - nao
 
   function alternar(a) {
     if (fechada) return toast('Rodada encerrada')
+    if (!diretor && a.id !== meuAtletaId) return
     if (a.dm) return toast('Atleta no DM')
+    if (a.afastado) return toast('Atleta afastado')
     const s = statusDe(a.id)
     const novo = s === 'S' ? 'N' : s === 'N' ? null : 'S'
     run(async () => {
@@ -55,11 +74,12 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
   // ---------- escalação ----------
   const nomeDe = (e) => e.convidado_nome || atletas.find((a) => a.id === e.atleta_id)?.nome || '?'
   const posDe = (e) => (e.convidado_nome ? 'conv.' : atletas.find((a) => a.id === e.atleta_id)?.posicao || '')
-  const confirmadosSemTime = sim.filter((id) => !esc.some((e) => e.atleta_id === id)).map((id) => atletas.find((a) => a.id === id)).filter(Boolean)
+  const baseBanco = passada ? atletas.filter((a) => !fora(a)).map((a) => a.id) : sim
+  const confirmadosSemTime = baseBanco.filter((id) => !esc.some((e) => e.atleta_id === id)).map((id) => atletas.find((a) => a.id === id)).filter(Boolean)
 
   // key: 'a:<atleta_id>' (banco) | 'c:<i>' (convidado no banco) | 'e:<id>' (linha já escalada)
   async function colocar(key, t, gk) {
-    if (fechada) return toast('Rodada encerrada')
+    if (!podeEditar) return toast(diretor ? 'Rodada encerrada' : 'Só a diretoria escala')
     await run(async () => {
       if (gk && t) {
         // só um goleiro por time: o anterior volta pro banco
@@ -92,8 +112,8 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
   }
 
   async function sortear() {
-    if (fechada) return toast('Rodada encerrada')
-    const c = sim.map((id) => atletas.find((a) => a.id === id)).filter(Boolean).sort(() => Math.random() - 0.5)
+    if (!podeEditar) return toast('Rodada encerrada')
+    const c = baseBanco.map((id) => atletas.find((a) => a.id === id)).filter(Boolean).sort(() => Math.random() - 0.5)
     const gks = c.filter((a) => a.posicao === 'GOL'), lin = c.filter((a) => a.posicao !== 'GOL')
     const linhas = []
     gks.forEach((a, i) => linhas.push({ rodada_id: rodada.id, atleta_id: a.id, time: i % 2 ? 'B' : 'P', goleiro: i < 2 }))
@@ -106,7 +126,7 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
     })
   }
   async function limpar() {
-    if (fechada) return toast('Rodada encerrada')
+    if (!podeEditar) return toast('Rodada encerrada')
     await run(async () => {
       const conv = esc.filter((e) => e.convidado_nome).map((e) => e.convidado_nome)
       setConvBanco((b) => [...b, ...conv])
@@ -118,6 +138,7 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
   const drag = useRef(null)
   useEffect(() => {
     const down = (e) => {
+      if (!podeEditar) return
       const el = e.target.closest('[data-key]'); if (!el) return
       drag.current = { key: el.dataset.key, label: el.textContent.trim(), ghost: null, x: e.clientX, y: e.clientY }
     }
@@ -156,6 +177,10 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
     await run(() => db.salvarResultado(rodada.id, +gp, +gb), 'Rodada salva · ranking atualizado')
     irParaRanking()
   }
+  async function salvarVencedor(v) {
+    await run(() => db.salvarVencedor(rodada.id, v), 'Resultado salvo · ranking atualizado')
+    irParaRanking()
+  }
   async function salvarCorrecao() {
     if (editando.gp === '' || editando.gb === '') return toast('Preencha o placar')
     await run(() => db.salvarResultado(editando.id, +editando.gp, +editando.gb), 'Placar corrigido')
@@ -184,11 +209,31 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
     <section className="tela on">
       <div className="row sb" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Rodada</h2>
-        <span className="tag preto">Seg {ddmm(rodada.data)}{fechada ? ' · encerrada' : ''}</span>
+        <button className="tag preto" style={{ cursor: diretor ? 'pointer' : 'default', font: 'inherit', fontSize: 11, fontWeight: 600 }} onClick={() => diretor && setEscolher(true)}>
+          Seg {ddmm(rodada.data)}{fechada ? ' · encerrada' : passada ? ' · a lançar' : ''}{diretor ? ' ▾' : ''}
+        </button>
       </div>
+      {diretor && aLancar.length > 0 && !passada && (
+        <p className="dica" style={{ margin: '-4px 0 12px' }}>⚠️ {aLancar.length} rodada{aLancar.length > 1 ? 's' : ''} antiga{aLancar.length > 1 ? 's' : ''} sem resultado — toque na data acima para lançar.</p>
+      )}
+      {!diretor && <p className="dica" style={{ margin: '-4px 0 12px' }}>Toque no seu nome para confirmar presença. Escalação e resultado são lançados pela diretoria.</p>}
       <div className="seg">
         {[1, 2, 3].map((n) => <button key={n} className={passo === n ? 'on' : ''} onClick={() => setPasso(n)}>{n} · {['Confirmações', 'Escalação', 'Resultado'][n - 1]}</button>)}
       </div>
+
+      {escolher && (
+        <div className="modal on"><div className="card sheet">
+          <h2>Qual rodada?</h2>
+          <button onClick={() => trocarRodada(null)}>📅 Próxima segunda ({ddmm(proximaSegunda())})</button>
+          {aLancar.map((r) => <button key={r.id} onClick={() => trocarRodada(r.id)}>⚠️ Seg {ddmm(r.data)} — a lançar</button>)}
+          <label className="lb" style={{ marginTop: 8 }}>Outra segunda-feira</label>
+          <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+            <input className="txt" type="date" value={outraData} onChange={(e) => setOutraData(e.target.value)} style={{ margin: 0 }} />
+            <button className="btn sm" onClick={abrirOutraData}>Abrir</button>
+          </div>
+          <button onClick={() => setEscolher(false)}>Fechar</button>
+        </div></div>
+      )}
 
       {passo === 1 && (
         <div>
@@ -199,14 +244,14 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
           </div>
           <div className="card"><div className="lista">
             {atletas.map((a) => { const s = statusDe(a.id); return (
-              <div key={a.id} className={`item ${a.dm ? 'dm' : ''}`} onClick={() => alternar(a)} style={{ cursor: 'pointer' }}>
+              <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`} onClick={() => alternar(a)} style={{ cursor: diretor || a.id === meuAtletaId ? 'pointer' : 'default', background: a.id === meuAtletaId ? '#151306' : undefined }}>
                 <div className="av">{ini(a.nome)}</div>
                 <div className="nome">{a.nome}<span className="sub">{a.posicao}</span></div>
-                {a.dm ? <span className="tag dm">DM</span> : s === 'S' ? <span className="tag ok">✓ vai</span> : s === 'N' ? <span className="tag nao">✗ não vai</span> : <span className="tag">—</span>}
+                {a.dm ? <span className="tag dm">DM</span> : a.afastado ? <span className="tag dm">afastado</span> : s === 'S' ? <span className="tag ok">✓ vai</span> : s === 'N' ? <span className="tag nao">✗ não vai</span> : <span className="tag">—</span>}
               </div>) })}
           </div></div>
-          <button className="btn" onClick={() => irParaMsg('lista')}>Cobrar quem ainda não confirmou</button>
-          <p className="dica">Toque no nome para alternar: confirmado → não vai → sem resposta.</p>
+          {diretor && <button className="btn" onClick={() => irParaMsg('lista')}>Cobrar quem ainda não confirmou</button>}
+          {diretor && <p className="dica">Toque no nome para alternar: confirmado → não vai → sem resposta.</p>}
         </div>
       )}
 
@@ -216,7 +261,7 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
             <Time t="P" nome="Preto" emoji="⚫" />
             <Time t="B" nome="Bege" emoji="🟡" />
           </div>
-          <h3>Confirmados sem time {confirmadosSemTime.length + convBanco.length ? `(${confirmadosSemTime.length + convBanco.length})` : ''}</h3>
+          {podeEditar && <><h3>Confirmados sem time {confirmadosSemTime.length + convBanco.length ? `(${confirmadosSemTime.length + convBanco.length})` : ''}</h3>
           <div className="card">
             <div className="banco drop" data-t="">
               {confirmadosSemTime.map((a) => <span key={a.id} className={`chip ${a.posicao === 'GOL' ? 'g' : ''}`} data-key={`a:${a.id}`}>{a.nome} <small style={{ opacity: .6 }}>{a.posicao}</small></span>)}
@@ -234,28 +279,36 @@ export default function Rodada({ atletas, irParaMsg, irParaRanking }) {
             <button className="btn sec" onClick={limpar}>Limpar</button>
           </div>
           <button className="btn" onClick={() => irParaMsg('escalacao')}>Gerar escalação pro WhatsApp (segunda)</button>
-          <p className="dica">Arraste o nome para dentro do time. Goleiro vai na faixa verde (Preto) ou laranja (Bege). Arraste de volta pro banco para tirar.</p>
+          <p className="dica">Arraste o nome para dentro do time. Goleiro vai na faixa verde (Preto) ou laranja (Bege). Arraste de volta pro banco para tirar.{passada ? ' Rodada antiga: não precisa de confirmação — arraste direto da lista de atletas.' : ''}</p></>}
+          {!podeEditar && !esc.length && <p className="dica">Escalação ainda não definida.</p>}
         </div>
       )}
 
       {passo === 3 && (
         <div>
-          <div className="card">
+          {diretor && <div className="card">
             <div className="placar">
               <div className="lb"><span className="tag preto">Preto</span><input type="number" min="0" value={gp} onChange={(e) => setGp(e.target.value)} /></div>
               <span>×</span>
               <div className="lb"><span className="tag bege">Bege</span><input type="number" min="0" value={gb} onChange={(e) => setGb(e.target.value)} /></div>
             </div>
             <button className="btn" onClick={salvarResultado}>{fechada ? 'Atualizar resultado' : 'Salvar resultado e pontuar'}</button>
+            <p className="dica" style={{ textAlign: 'center' }}>Não lembra o placar? Marque só quem venceu:</p>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn sec sm" style={{ flex: 1 }} onClick={() => salvarVencedor('P')}>⚫ Preto</button>
+              <button className="btn sec sm" style={{ flex: 1 }} onClick={() => salvarVencedor('E')}>Empate</button>
+              <button className="btn sec sm" style={{ flex: 1 }} onClick={() => salvarVencedor('B')}>🟡 Bege</button>
+            </div>
             <p className="dica">Vitória = 3 pts · Empate = 1 pt · Derrota = 0. Cada jogador escalado recebe os pontos do seu time. Quem não jogou não conta jogo nem ponto. Convidados não pontuam.</p>
-          </div>
+          </div>}
+          {!diretor && <div className="card"><p className="dica" style={{ margin: 0 }}>{fechada ? `Resultado: ${nomeVencedor(rodada)}${temPlacar(rodada) ? ` (${rodada.gols_preto} × ${rodada.gols_bege})` : ''}` : 'Resultado ainda não lançado.'}</p></div>}
           <h3>Rodadas registradas</h3>
           <div className="card"><div className="lista">
             {encerradas.map((r) => (
               <div key={r.id}>
-                <div className="item" onClick={() => setEditando(editando?.id === r.id ? null : { id: r.id, gp: String(r.gols_preto), gb: String(r.gols_bege) })} style={{ cursor: 'pointer' }}>
+                <div className="item" onClick={() => diretor && setEditando(editando?.id === r.id ? null : { id: r.id, gp: r.gols_preto ?? '', gb: r.gols_bege ?? '' })} style={{ cursor: diretor ? 'pointer' : 'default' }}>
                   <div className="nome">Seg {ddmm(r.data)}<span className="sub">{r.cond_escalacoes.filter((e) => e.atleta_id).length} atletas{r.cond_escalacoes.some((e) => e.convidado_nome) ? ` + ${r.cond_escalacoes.filter((e) => e.convidado_nome).length} conv.` : ''} · {nomeVencedor(r)}</span></div>
-                  <span className="tag preto">Preto {r.gols_preto}</span><span className="tag bege">Bege {r.gols_bege}</span>
+                  {temPlacar(r) ? <><span className="tag preto">Preto {r.gols_preto}</span><span className="tag bege">Bege {r.gols_bege}</span></> : <span className="tag">{r.vencedor === 'P' ? '⚫ venceu' : r.vencedor === 'B' ? '🟡 venceu' : 'empate'}</span>}
                 </div>
                 {editando?.id === r.id && (
                   <div style={{ padding: '4px 0 12px' }}>

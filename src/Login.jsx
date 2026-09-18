@@ -1,19 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { useToast } from './ui'
+import * as db from './lib/dados'
 
 const ESCUDO = import.meta.env.BASE_URL + 'escudo.png'
 
-// Tela de entrada. Modo "entrar" (e-mail + senha) ou "cadastro" (link de convite).
-export default function Login({ conviteInicial }) {
+// Tela de entrada. Com um convite na URL (#/convite/TOKEN) abre o cadastro; sem, abre o login.
+export default function Login({ token }) {
   const toast = useToast()
-  const [modo, setModo] = useState(conviteInicial ? 'cadastro' : 'entrar')
+  const [modo, setModo] = useState(token ? 'cadastro' : 'entrar')
+  const [convite, setConvite] = useState(null) // {nome, papel, usado}
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
-  const [nome, setNome] = useState('')
-  const [codigo, setCodigo] = useState(conviteInicial || '')
   const [ocupado, setOcupado] = useState(false)
   const [aviso, setAviso] = useState('')
+
+  useEffect(() => {
+    if (!token) return
+    db.verConvite(token).then((c) => { if (!c) { toast('Convite inválido'); setModo('entrar') } else setConvite(c) }).catch((e) => toast(e.message))
+  }, [token])
 
   async function entrar(e) {
     e.preventDefault()
@@ -25,18 +30,21 @@ export default function Login({ conviteInicial }) {
 
   async function cadastrar(e) {
     e.preventDefault()
-    if (!nome.trim() || !codigo.trim()) return toast('Preencha nome e código do convite')
     setOcupado(true)
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: senha,
-      options: { data: { nome: nome.trim(), codigo_convite: codigo.trim().toUpperCase() } },
-    })
+    // guarda o convite: assim que houver sessão, o App liga a conta à ficha (ver App.jsx)
+    localStorage.setItem('cond_convite_token', token)
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: senha })
     setOcupado(false)
-    if (error) return toast(error.message)
-    // guarda nome+código para liberar o acesso assim que houver sessão (ver App.jsx)
-    localStorage.setItem('cond_convite', JSON.stringify({ nome: nome.trim(), codigo: codigo.trim().toUpperCase() }))
-    if (!data.session) setAviso('Cadastro feito! Enviamos um e-mail de confirmação. Confirme e depois entre aqui com seu e-mail e senha.')
+    if (error) {
+      if (/already|registered|exists/i.test(error.message)) {
+        // já tem conta: basta entrar que o convite é aplicado
+        const r = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha })
+        if (r.error) toast('Esse e-mail já tem conta. Entre com a senha dele para aceitar o convite.')
+        return
+      }
+      return toast(error.message)
+    }
+    if (!data.session) setAviso('Conta criada! Enviamos um e-mail de confirmação. Confirme e depois entre aqui com seu e-mail e senha — o convite é aplicado automaticamente.')
   }
 
   return (
@@ -55,23 +63,22 @@ export default function Login({ conviteInicial }) {
             <label className="lb">Senha</label>
             <input className="txt" type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
             <button className="btn" disabled={ocupado}>{ocupado ? 'Entrando…' : 'Entrar'}</button>
-            <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>
-              Recebeu um convite?{' '}
-              <a href="#" style={{ color: 'var(--bege)' }} onClick={(e) => { e.preventDefault(); setModo('cadastro') }}>Criar minha conta</a>
-            </p>
+            <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>Ainda não tem conta? Peça o link de convite para a diretoria.</p>
           </form>
         ) : (
           <form onSubmit={cadastrar}>
             <h2>Criar conta</h2>
-            <label className="lb">Seu nome (como aparece no grupo)</label>
-            <input className="txt" value={nome} onChange={(e) => setNome(e.target.value)} required />
-            <label className="lb">E-mail</label>
+            {convite && (
+              <p style={{ marginBottom: 12, lineHeight: 1.5 }}>
+                Convite para <b>{convite.nome}</b> · {convite.papel === 'diretor' ? 'diretoria' : 'atleta'}
+                {convite.usado && <span className="dica"> (este convite já foi usado — se for você, é só entrar)</span>}
+              </p>
+            )}
+            <label className="lb">Seu e-mail</label>
             <input className="txt" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <label className="lb">Senha</label>
+            <label className="lb">Crie uma senha</label>
             <input className="txt" type="password" autoComplete="new-password" minLength={6} value={senha} onChange={(e) => setSenha(e.target.value)} required />
-            <label className="lb">Código do convite</label>
-            <input className="txt" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="CONDORES-XXXXXX" required />
-            <button className="btn" disabled={ocupado}>{ocupado ? 'Criando…' : 'Criar conta'}</button>
+            <button className="btn" disabled={ocupado || !convite}>{ocupado ? 'Criando…' : 'Criar conta'}</button>
             <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>
               <a href="#" style={{ color: 'var(--bege)' }} onClick={(e) => { e.preventDefault(); setModo('entrar') }}>Já tenho conta</a>
             </p>
@@ -82,38 +89,15 @@ export default function Login({ conviteInicial }) {
   )
 }
 
-// Tela mostrada quando a pessoa está logada mas ainda não foi liberada (não está na diretoria)
-export function Convite({ email, onLiberado, onSair }) {
-  const toast = useToast()
-  const salvo = JSON.parse(localStorage.getItem('cond_convite') || 'null')
-  const [nome, setNome] = useState(salvo?.nome || '')
-  const [codigo, setCodigo] = useState(salvo?.codigo || '')
-  const [ocupado, setOcupado] = useState(false)
-
-  async function liberar(e) {
-    e.preventDefault()
-    setOcupado(true)
-    const { error } = await supabase.rpc('cond_aceitar_convite', { p_codigo: codigo.trim(), p_nome: nome.trim() })
-    setOcupado(false)
-    if (error) return toast(error.message)
-    localStorage.removeItem('cond_convite')
-    onLiberado()
-  }
-
+// Logado, mas ainda sem vínculo (não está em cond_usuarios) e sem convite guardado
+export function SemAcesso({ email, onSair }) {
   return (
     <div id="login">
       <img src={ESCUDO} alt="Condores" />
       <div className="card">
         <h2>Quase lá</h2>
-        <p className="dica" style={{ marginBottom: 12 }}>Logado como {email}. Informe o código do convite que você recebeu.</p>
-        <form onSubmit={liberar}>
-          <label className="lb">Seu nome</label>
-          <input className="txt" value={nome} onChange={(e) => setNome(e.target.value)} required />
-          <label className="lb">Código do convite</label>
-          <input className="txt" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
-          <button className="btn" disabled={ocupado}>Liberar acesso</button>
-        </form>
-        <button className="btn sec" style={{ marginTop: 10 }} onClick={onSair}>Sair</button>
+        <p className="dica" style={{ marginBottom: 12, lineHeight: 1.5 }}>Você entrou como {email}, mas essa conta ainda não está ligada a nenhum atleta. Abra o link de convite que a diretoria te mandou pelo WhatsApp (estando logado) e o acesso é liberado na hora.</p>
+        <button className="btn sec" onClick={onSair}>Sair</button>
       </div>
     </div>
   )

@@ -3,21 +3,26 @@ import json, uuid, re
 from urllib.parse import urlparse, parse_qs, unquote
 
 DIRETORIA = {'francoboaventura@icloud.com': 'Franco'}
+CONVITES = []
 CODIGO = 'CONDORES-39585C'
 USERS = {'francoboaventura@icloud.com': '123456'}
+SESSAO = {'email': 'francoboaventura@icloud.com'}
 
 nomes = [("Wilson",11,9),("Rodrigo",25,2),("Ivan",4,1),("Lucas",19,9),("Henrique",12,12),("Edson",26,9),("Guilherme",17,2),
          ("Alisson",1,12),("Franco",15,2),("Rafael",12,1),("Guga",2,5),("Jura",21,2),("Maurício",13,10),("Carlos",10,10),
          ("Cassio",11,11),("Anderson",23,7),("Kauan",8,9),("Pico",17,12),("Dudu",9,5),("Simões",None,None)]
 DB = {
     'cond_atletas': [dict(id=str(uuid.uuid4()), nome=n, posicao='GOL' if n in ('Pico','Cassio') else 'MEI', aniv_dia=d, aniv_mes=m,
-                          whatsapp=None, foto_url=None, dm=False, ativo=True) for n,d,m in nomes],
-    'cond_rodadas': [], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_diretoria': [dict(email=e, nome=n) for e,n in DIRETORIA.items()],
+                          whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True) for n,d,m in nomes],
+    'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, origem='planilha')], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
 }
 
+def venc(r):
+    if r.get('gols_preto') is not None and r.get('gols_bege') is not None:
+        return 'E' if r['gols_preto'] == r['gols_bege'] else ('P' if r['gols_preto'] > r['gols_bege'] else 'B')
+    return r.get('vencedor')
 def resultado(r, t):
-    if r['gols_preto'] == r['gols_bege']: return 'E'
-    return 'V' if (('P' if r['gols_preto'] > r['gols_bege'] else 'B') == t) else 'D'
+    v = venc(r); return 'E' if v == 'E' else ('V' if v == t else 'D')
 
 def view_ranking():
     enc = [r for r in DB['cond_rodadas'] if r['status'] == 'encerrada']
@@ -42,6 +47,7 @@ def filtrar(rows, qs):
             op, _, val = v.partition('.')
             if op == 'eq': rows = [r for r in rows if str(r.get(k)).lower() == val.lower()]
             elif op == 'gt': rows = [r for r in rows if (r.get(k) or 0) > float(val)]
+            elif op == 'lt': rows = [r for r in rows if str(r.get(k)) < val]
             elif op == 'in': rows = [r for r in rows if str(r.get(k)) in val.strip('()').split(',')]
     if 'order' in qs:
         for o in reversed(qs['order'][0].split(',')):
@@ -75,14 +81,28 @@ async def handle(route, request):
         return await route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*'})
     if path.startswith('/auth/v1/token'):
         if USERS.get(body['email']) == body['password']:
+            SESSAO['email'] = body['email']
             return await send(dict(access_token='tok', token_type='bearer', expires_in=3600, expires_at=9999999999, refresh_token='ref', user=dict(id='u1', email=body['email'], aud='authenticated', role='authenticated')))
         return await send(dict(error='invalid_grant', error_description='Invalid login credentials', msg='Invalid login credentials'), 400)
     if path.startswith('/auth/v1/user'):
-        return await send(dict(id='u1', email='francoboaventura@icloud.com', aud='authenticated', role='authenticated'))
+        return await send(dict(id='u1', email=SESSAO['email'], aud='authenticated', role='authenticated'))
+    if path.startswith('/auth/v1/signup'):
+        USERS[body['email']] = body['password']; SESSAO['email'] = body['email']
+        return await send(dict(access_token='tok', token_type='bearer', expires_in=3600, expires_at=9999999999, refresh_token='ref', user=dict(id='u2', email=body['email'], aud='authenticated', role='authenticated')))
     if path.startswith('/auth/v1/logout'):
         return await send({}, 204)
-    if path.startswith('/rest/v1/rpc/cond_aceitar_convite'):
-        return await send('francoboaventura@icloud.com')
+    if path.startswith('/rest/v1/rpc/cond_ver_convite'):
+        c = next((c for c in CONVITES if c['token'] == body['p_token']), None)
+        if not c: return await send(None)
+        a = next(a for a in DB['cond_atletas'] if a['id'] == c['atleta_id'])
+        return await send(dict(nome=a['nome'], papel=c['papel'], usado=c.get('usado_em') is not None))
+    if path.startswith('/rest/v1/rpc/cond_usar_convite'):
+        c = next((c for c in CONVITES if c['token'] == body['p_token']), None)
+        if not c: return await send(dict(message='Convite inválido.'), 400)
+        a = next(a for a in DB['cond_atletas'] if a['id'] == c['atleta_id'])
+        DB['cond_usuarios'] = [u for u in DB['cond_usuarios'] if u['email'] != SESSAO['email']] + [dict(email=SESSAO['email'], nome=a['nome'], papel=c['papel'], atleta_id=a['id'])]
+        c['usado_em'] = 'agora'
+        return await send(dict(nome=a['nome'], papel=c['papel']))
 
     tabela = path.split('/rest/v1/')[1]
     if tabela == 'cond_ranking': return await send(filtrar(view_ranking(), qs))
@@ -103,13 +123,15 @@ async def handle(route, request):
                 ex = next((r for r in rows if all(r.get(k) == it.get(k) for k in key) and it.get(key[0]) is not None), None)
                 if ex: ex.update(it); saved.append(ex); continue
             if 'id' not in it: it['id'] = str(uuid.uuid4())
-            if tabela == 'cond_rodadas': it.setdefault('status', 'aberta'); it.setdefault('gols_preto', None); it.setdefault('gols_bege', None)
-            if tabela == 'cond_atletas': it.setdefault('dm', False); it.setdefault('ativo', True); it.setdefault('posicao', 'MEI')
+            if tabela == 'cond_rodadas': it.setdefault('status', 'aberta'); it.setdefault('gols_preto', None); it.setdefault('gols_bege', None); it.setdefault('vencedor', None)
+            if tabela == 'cond_atletas': it.setdefault('dm', False); it.setdefault('afastado', False); it.setdefault('ativo', True); it.setdefault('posicao', 'MEI')
             if tabela == 'cond_escalacoes': it.setdefault('goleiro', False); it.setdefault('atleta_id', None); it.setdefault('convidado_nome', None)
             rows.append(it); saved.append(it)
         return await send(saved if isinstance(body, list) else (saved[0] if 'object' in request.headers.get('accept', '') else saved), 201)
     if method == 'PATCH':
-        for r in filtrar(rows, qs): r.update(body)
+        for r in filtrar(rows, qs):
+            r.update(body)
+            if tabela == 'cond_rodadas' and r.get('gols_preto') is not None: r['vencedor'] = venc(r)
         return await send([])
     if method == 'DELETE':
         alvo = filtrar(rows, qs)

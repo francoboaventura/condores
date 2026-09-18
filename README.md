@@ -8,11 +8,17 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 - Toda alteração enviada para a branch `main` é publicada automaticamente no GitHub Pages (aba *Actions* mostra o andamento; leva 1–2 minutos).
 - Os dados ficam no Supabase (projeto `togethere-teste`), nas tabelas com prefixo `cond_`.
-- Só entra quem está na tabela `cond_diretoria`. Quem recebe o link de convite cria a conta com e-mail, senha e o código do convite.
+- Só entra quem está na tabela `cond_usuarios` (ligado a um atleta, com papel diretor ou atleta).
 
-## Convidar alguém da diretoria
+## Acessos
 
-Envie o link `https://francoboaventura.github.io/condores/#/convite/CODIGO` (o código está na tabela `cond_config`, chave `codigo_convite`). A pessoa cria a conta e já entra liberada.
+- **Diretoria**: cadastra atletas, escala, lança resultado, corrige placar, convida.
+- **Atleta (usuário comum)**: vê tudo e confirma a própria presença.
+- Convite: na tela Atletas, o ✉ ao lado do nome gera um link pessoal (usuário comum ou diretor). Quem abre cria e-mail + senha e a conta já nasce ligada à ficha.
+
+## Histórico
+
+As 26 rodadas preenchidas na planilha "Condores 2026" foram importadas (`dados/importar-planilha.sql`, gerado a partir de `dados/condores-2026.csv`). Rodadas sem resultado aparecem como "a lançar" na tela Rodada (toque na data).
 
 ## Desenvolvimento
 

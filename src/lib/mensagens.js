@@ -3,7 +3,7 @@ import { ddmm } from './util'
 // Lista de sexta: só quem ainda não respondeu (DM não entra)
 export function msgFaltam(rodada, atletas, confirmacoes) {
   const resp = new Set(confirmacoes.map((c) => c.atleta_id))
-  const pend = atletas.filter((a) => !a.dm && !resp.has(a.id)).map((a) => a.nome)
+  const pend = atletas.filter((a) => !a.dm && !a.afastado && !resp.has(a.id)).map((a) => a.nome)
   const lista = pend.map((n, i) => `${i + 1}. ${n}`).join('\n') || 'Todo mundo já respondeu 👏'
   return `⚽ *CONDORES — Segunda ${ddmm(rodada.data)}*\n🕗 20h às 21h · Radar\n\n❓ *Ainda não confirmaram (${pend.length})*\n${lista}\n\nConfirma aí até domingo! 🦅`
 }
