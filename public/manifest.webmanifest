@@ -1,0 +1,13 @@
+{
+  "name": "Condores",
+  "short_name": "Condores",
+  "start_url": "/condores/",
+  "scope": "/condores/",
+  "display": "standalone",
+  "background_color": "#0b0b0b",
+  "theme_color": "#0b0b0b",
+  "icons": [
+    { "src": "/condores/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/condores/icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
