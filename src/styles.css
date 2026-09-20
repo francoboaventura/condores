@@ -187,3 +187,7 @@ header .usr a{display:block;font-size:11px;text-decoration:underline;margin-top:
 .detalhe li{font-size:13px;padding:3px 0;break-inside:avoid;display:flex;align-items:center;gap:5px}
 .detalhe li small{color:var(--mudo);font-size:10px}
 .detalhe li .tag{padding:1px 6px;font-size:9px}
+
+/* número da camisa no lugar das iniciais */
+.av.camisa{background:#000;border:1px solid var(--bege2);color:var(--bege);font-size:15px;font-weight:800}
+.item.dm .av.camisa{border-color:var(--linha)}

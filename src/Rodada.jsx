@@ -352,8 +352,8 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
           <div className="card"><div className="lista">
             {atletas.map((a) => { const s = statusDe(a.id); return (
               <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`} onClick={() => alternar(a)} style={{ cursor: diretor || a.id === meuAtletaId ? 'pointer' : 'default', background: a.id === meuAtletaId ? '#151306' : undefined }}>
-                <div className="av">{ini(a.nome)}</div>
-                <div className="nome">{a.nome}<span className="sub">{a.posicao}</span></div>
+                <div className={`av ${a.numero != null ? 'camisa' : ''}`}>{a.numero != null ? a.numero : ini(a.nome)}</div>
+                <div className="nome">{a.nome}<span className="sub">{a.posicao}{a.tamanho ? ` · 👕 ${a.tamanho}` : ''}</span></div>
                 {a.dm ? <span className="tag dm">DM</span> : a.afastado ? <span className="tag dm">afastado</span> : s === 'S' ? <span className="tag ok">✓ vai</span> : s === 'N' ? <span className="tag nao">✗ não vai</span> : <span className="tag">—</span>}
               </div>) })}
           </div></div>

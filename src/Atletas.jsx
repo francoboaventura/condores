@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { PosBtn, Modal, useToast } from './ui'
-import { ini, aniv, URL_APP, linkWhatsApp, fora, POS } from './lib/util'
+import { ini, aniv, URL_APP, linkWhatsApp, fora, POS, TAMANHOS } from './lib/util'
 import * as db from './lib/dados'
 
-const vazio = { nome: '', posicao: 'MEI', anivTxt: '', whatsapp: '' }
+const vazio = { nome: '', posicao: 'MEI', anivTxt: '', whatsapp: '', numero: '', tamanho: '' }
 
 export default function Atletas({ atletas, recarregar, diretor }) {
   const toast = useToast()
@@ -19,13 +19,14 @@ export default function Atletas({ atletas, recarregar, diretor }) {
   const afastados = atletas.filter((a) => a.afastado).length
   const comConta = (a) => usuarios.find((u) => u.atleta_id === a.id)
 
-  const ORD = { nome: 'A–Z', posicao: 'Posição', aniv: 'Aniversário' }
+  const ORD = { nome: 'A–Z', numero: 'Número', posicao: 'Posição', aniv: 'Aniversário' }
   const mesDia = (a) => (a.aniv_mes ? a.aniv_mes * 100 + a.aniv_dia : 9999)
   const lista = atletas
     .filter((a) => (!fPos || a.posicao === fPos)
       && (!fSit || (fSit === 'dm' ? a.dm : fSit === 'afastado' ? a.afastado : !fora(a))))
     .sort((x, y) => (
-      ordem === 'posicao' ? POS.indexOf(x.posicao) - POS.indexOf(y.posicao) || x.nome.localeCompare(y.nome)
+      ordem === 'numero' ? (x.numero ?? 999) - (y.numero ?? 999) || x.nome.localeCompare(y.nome)
+        : ordem === 'posicao' ? POS.indexOf(x.posicao) - POS.indexOf(y.posicao) || x.nome.localeCompare(y.nome)
         : ordem === 'aniv' ? mesDia(x) - mesDia(y) || x.nome.localeCompare(y.nome)
           : x.nome.localeCompare(y.nome)
     ))
@@ -39,7 +40,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
 
   function abrirEditar(a) {
     if (!diretor) return
-    setForm({ id: a.id, nome: a.nome, posicao: a.posicao, anivTxt: aniv(a), whatsapp: a.whatsapp || '' })
+    setForm({ id: a.id, nome: a.nome, posicao: a.posicao, anivTxt: aniv(a), whatsapp: a.whatsapp || '', numero: a.numero ?? '', tamanho: a.tamanho || '' })
   }
 
   async function salvar() {
@@ -50,7 +51,13 @@ export default function Atletas({ atletas, recarregar, diretor }) {
       if (!m) return toast('Aniversário no formato dd/mm')
       aniv_dia = +m[1]; aniv_mes = +m[2]
     }
-    const linha = { nome: form.nome.trim(), posicao: form.posicao, aniv_dia, aniv_mes, whatsapp: form.whatsapp.trim() || null }
+    if (form.numero !== '' && (isNaN(+form.numero) || +form.numero < 0 || +form.numero > 99)) return toast('Número de 0 a 99')
+    const linha = {
+      nome: form.nome.trim(), posicao: form.posicao, aniv_dia, aniv_mes,
+      whatsapp: form.whatsapp.trim() || null,
+      numero: form.numero === '' ? null : +form.numero,
+      tamanho: form.tamanho || null,
+    }
     if (form.id) linha.id = form.id
     await run(() => db.salvarAtleta(linha), form.id ? 'Atleta atualizado' : 'Atleta cadastrado')
     setForm(null)
@@ -98,7 +105,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
       <div className="filtros">
         <div className="fl">
           {POS.map((p) => <button key={p} className={fPos === p ? 'on' : ''} onClick={() => setFPos(fPos === p ? null : p)}>{p}</button>)}
-          <button className="ord" onClick={() => setOrdem(ordem === 'nome' ? 'posicao' : ordem === 'posicao' ? 'aniv' : 'nome')} title="Mudar a ordem">⇅ {ORD[ordem]}</button>
+          <button className="ord" onClick={() => setOrdem(ordem === 'nome' ? 'numero' : ordem === 'numero' ? 'posicao' : ordem === 'posicao' ? 'aniv' : 'nome')} title="Mudar a ordem">⇅ {ORD[ordem]}</button>
         </div>
         <div className="fl">
           {[['apto', 'Disponíveis'], ['dm', '🏥 DM'], ['afastado', '⏸ Afastados']].map(([k, nome]) => (
@@ -111,10 +118,10 @@ export default function Atletas({ atletas, recarregar, diretor }) {
         <div className="lista">
           {lista.map((a) => (
             <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`}>
-              <div className="av">{ini(a.nome)}</div>
+              <div className={`av ${a.numero != null ? 'camisa' : ''}`}>{a.numero != null ? a.numero : ini(a.nome)}</div>
               <div className="nome" onClick={() => abrirEditar(a)} style={{ cursor: diretor ? 'pointer' : 'default' }}>
                 {a.nome} {a.dm && <span className="tag dm">DM</span>}{a.afastado && <span className="tag dm">afastado</span>}
-                <span className="sub">🎂 {aniv(a) || '—'} · 📱 {a.whatsapp || '—'}{diretor && comConta(a) ? ` · ${comConta(a).papel === 'diretor' ? '⭐ diretoria' : '✅ tem acesso'}` : ''}</span>
+                <span className="sub">{a.tamanho ? `👕 ${a.tamanho} · ` : ''}🎂 {aniv(a) || '—'} · 📱 {a.whatsapp || '—'}{diretor && comConta(a) ? ` · ${comConta(a).papel === 'diretor' ? '⭐ diretoria' : '✅ tem acesso'}` : ''}</span>
               </div>
               {diretor
                 ? <PosBtn pos={a.posicao} onChange={(p) => run(() => db.atualizarAtleta(a.id, { posicao: p }))} />
@@ -138,6 +145,19 @@ export default function Atletas({ atletas, recarregar, diretor }) {
             <label className="lb">Posição</label>
             <PosBtn big pos={form.posicao} onChange={(p) => setForm({ ...form, posicao: p })} />
             <p className="dica" style={{ margin: '-2px 0 10px' }}>Segure o botão para escolher: GOL · ZAG · MEI · ATA.</p>
+            <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <label className="lb">Camisa nº</label>
+                <input className="txt" type="number" min="0" max="99" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="—" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="lb">Tamanho</label>
+                <select className="txt" value={form.tamanho} onChange={(e) => setForm({ ...form, tamanho: e.target.value })}>
+                  <option value="">—</option>
+                  {TAMANHOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
             <label className="lb">Aniversário</label>
             <input className="txt" value={form.anivTxt} onChange={(e) => setForm({ ...form, anivTxt: e.target.value })} placeholder="dd/mm" />
             <label className="lb">WhatsApp</label>

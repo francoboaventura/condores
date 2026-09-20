@@ -52,8 +52,18 @@ async def main():
             assert 'no DM' in await pg.locator('.tag').first.inner_text()
             await pg.locator('.item').nth(5).locator('.more:not([title])').click(); await pg.click('text=Afastamento justificado'); await pg.wait_for_timeout(300)
             assert 'afastado' in await pg.locator('.tag').first.inner_text()
-            await pg.click('.fab'); await pg.fill('.modal input.txt >> nth=0', 'Zé Teste'); await pg.fill('.modal input.txt >> nth=1', '05/06'); await pg.click('.modal button:has-text("Salvar")')
+            # número e tamanho da camisa
+            assert await pg.locator('.item:has-text("Wilson") .av.camisa').inner_text() == '17'
+            assert '👕 G' in await pg.locator('.item:has-text("Wilson") .sub').inner_text()
+            await pg.click('.fab')
+            await pg.fill('.modal input.txt >> nth=0', 'Zé Teste')
+            await pg.fill('.modal input[type=number]', '77')
+            await pg.select_option('.modal select', 'GG')
+            await pg.fill('.modal input.txt >> nth=2', '05/06')
+            await pg.click('.modal button:has-text("Salvar")')
             await pg.wait_for_timeout(300); assert await pg.locator('.item:has-text("Zé Teste")').count() == 1
+            assert await pg.locator('.item:has-text("Zé Teste") .av').inner_text() == '77'
+            assert '👕 GG' in await pg.locator('.item:has-text("Zé Teste") .sub').inner_text()
 
             # ---- filtros e ordenação ----
             total = await pg.locator('.card .item').count()
@@ -70,6 +80,8 @@ async def main():
             await pg.click('.filtros button.limpa'); await pg.wait_for_timeout(300)
             assert await pg.locator('.card .item').count() == total
             primeiro = await pg.locator('.card .item .nome').first.inner_text()
+            await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # por número
+            assert (await pg.locator('.card .item .av').first.inner_text()) == '1'
             await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # por posição
             assert (await pg.locator('.card .item .posbtn').first.inner_text()) == 'GOL'
             await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # por aniversário

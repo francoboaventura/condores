@@ -11,9 +11,12 @@ SESSAO = {'email': 'francoboaventura@icloud.com'}
 nomes = [("Wilson",11,9),("Rodrigo",25,2),("Ivan",4,1),("Lucas",19,9),("Henrique",12,12),("Edson",26,9),("Guilherme",17,2),
          ("Alisson",1,12),("Franco",15,2),("Rafael",12,1),("Guga",2,5),("Jura",21,2),("Maurício",13,10),("Carlos",10,10),
          ("Cassio",11,11),("Anderson",23,7),("Kauan",8,9),("Pico",17,12),("Dudu",9,5),("Simões",None,None)]
+CAMISA = {"Wilson":(17,"G"),"Rodrigo":(3,"M"),"Ivan":(1,"G"),"Lucas":(99,"G"),"Edson":(18,"M"),"Guilherme":(19,"G"),
+          "Franco":(1,"M"),"Rafael":(86,"G"),"Jura":(11,"G"),"Maurício":(2,"M"),"Carlos":(12,"M"),"Cassio":(13,"M"),
+          "Anderson":(14,"G"),"Kauan":(30,"M"),"Pico":(15,"M"),"Dudu":(5,"G"),"Simões":(6,"M")}
 DB = {
     'cond_atletas': [dict(id=str(uuid.uuid4()), nome=n, posicao={'Pico':'GOL','Cassio':'GOL','Ivan':'ZAG','Edson':'ZAG','Carlos':'ZAG','Jura':'ZAG','Rafael':'ZAG','Wilson':'ATA','Lucas':'ATA','Alisson':'ATA','Guga':'ATA','Anderson':'ATA'}.get(n,'MEI'), aniv_dia=d, aniv_mes=m,
-                          whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True) for n,d,m in nomes],
+                          whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True, numero=CAMISA.get(n,(None,None))[0], tamanho=CAMISA.get(n,(None,None))[1]) for n,d,m in nomes],
     'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, vice=None, times_qtd=2, origem='planilha')], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
 }
 
@@ -132,7 +135,7 @@ async def handle(route, request):
                 if ex: ex.update(it); saved.append(ex); continue
             if 'id' not in it: it['id'] = str(uuid.uuid4())
             if tabela == 'cond_rodadas': it.setdefault('status', 'aberta'); it.setdefault('gols_preto', None); it.setdefault('gols_bege', None); it.setdefault('vencedor', None); it.setdefault('vice', None); it.setdefault('times_qtd', 2)
-            if tabela == 'cond_atletas': it.setdefault('dm', False); it.setdefault('afastado', False); it.setdefault('ativo', True); it.setdefault('posicao', 'MEI')
+            if tabela == 'cond_atletas': it.setdefault('dm', False); it.setdefault('afastado', False); it.setdefault('ativo', True); it.setdefault('numero', None); it.setdefault('tamanho', None); it.setdefault('posicao', 'MEI')
             if tabela == 'cond_escalacoes': it.setdefault('goleiro', False); it.setdefault('atleta_id', None); it.setdefault('convidado_nome', None); it.setdefault('convidado_pos', None)
             rows.append(it); saved.append(it)
         return await send(saved if isinstance(body, list) else (saved[0] if 'object' in request.headers.get('accept', '') else saved), 201)

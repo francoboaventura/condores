@@ -1,4 +1,5 @@
 export const POS = ['GOL', 'ZAG', 'MEI', 'ATA']
+export const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XGG']
 // fora do time no momento (DM ou afastamento justificado)
 export const fora = (a) => !!(a.dm || a.afastado)
 

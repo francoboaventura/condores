@@ -18,7 +18,7 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 ## Atletas
 
-Filtros por posição (GOL/ZAG/MEI/ATA) e por situação (disponíveis / DM / afastados), com botão ⇅ para alternar a ordem entre A–Z, posição e aniversário.
+Cada atleta tem número e tamanho de camisa; o número aparece no lugar das iniciais. Filtros por posição (GOL/ZAG/MEI/ATA) e por situação (disponíveis / DM / afastados), com botão ⇅ para alternar a ordem entre A–Z, número, posição e aniversário.
 
 ## Confirmações
 
