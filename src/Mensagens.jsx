@@ -3,7 +3,7 @@ import { useToast } from './ui'
 import { msgFaltam, msgEscalacao, msgRanking } from './lib/mensagens'
 import * as db from './lib/dados'
 
-export default function Mensagens({ atletas, tipoInicial }) {
+export default function Mensagens({ atletas, tipoInicial, origem, onVoltar }) {
   const toast = useToast()
   const [tipo, setTipo] = useState(tipoInicial || 'lista')
   const [txt, setTxt] = useState('')
@@ -32,6 +32,13 @@ export default function Mensagens({ atletas, tipoInicial }) {
 
   return (
     <section className="tela on">
+      {origem && (
+        <div className="migalhas">
+          <button onClick={onVoltar}>‹ {origem.tela === 'rodada' ? 'Rodada' : 'Ranking'}</button>
+          {origem.nome && <><span>›</span><button onClick={onVoltar}>{origem.nome}</button></>}
+          <span>›</span><b>WhatsApp</b>
+        </div>
+      )}
       <h2>Mensagens</h2>
       <div className="seg">
         <button className={tipo === 'lista' ? 'on' : ''} onClick={() => setTipo('lista')}>Faltam confirmar</button>

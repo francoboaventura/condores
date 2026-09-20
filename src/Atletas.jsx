@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PosBtn, Modal, useToast } from './ui'
-import { ini, aniv, URL_APP, linkWhatsApp, fora } from './lib/util'
+import { ini, aniv, URL_APP, linkWhatsApp, fora, POS } from './lib/util'
 import * as db from './lib/dados'
 
 const vazio = { nome: '', posicao: 'MEI', anivTxt: '', whatsapp: '' }
@@ -11,10 +11,25 @@ export default function Atletas({ atletas, recarregar, diretor }) {
   const [menu, setMenu] = useState(null)      // atleta (folha ⋯)
   const [convite, setConvite] = useState(null) // {atleta, papel?, token?}
   const [usuarios, setUsuarios] = useState([])
+  const [fPos, setFPos] = useState(null)      // GOL | ZAG | MEI | ATA
+  const [fSit, setFSit] = useState(null)      // apto | dm | afastado
+  const [ordem, setOrdem] = useState('nome')  // nome | posicao | aniv
 
   const noDM = atletas.filter((a) => a.dm).length
   const afastados = atletas.filter((a) => a.afastado).length
   const comConta = (a) => usuarios.find((u) => u.atleta_id === a.id)
+
+  const ORD = { nome: 'A–Z', posicao: 'Posição', aniv: 'Aniversário' }
+  const mesDia = (a) => (a.aniv_mes ? a.aniv_mes * 100 + a.aniv_dia : 9999)
+  const lista = atletas
+    .filter((a) => (!fPos || a.posicao === fPos)
+      && (!fSit || (fSit === 'dm' ? a.dm : fSit === 'afastado' ? a.afastado : !fora(a))))
+    .sort((x, y) => (
+      ordem === 'posicao' ? POS.indexOf(x.posicao) - POS.indexOf(y.posicao) || x.nome.localeCompare(y.nome)
+        : ordem === 'aniv' ? mesDia(x) - mesDia(y) || x.nome.localeCompare(y.nome)
+          : x.nome.localeCompare(y.nome)
+    ))
+  const filtrando = fPos || fSit
 
   useEffect(() => { if (diretor) db.listarUsuarios().then(setUsuarios).catch(() => {}) }, [diretor, atletas])
 
@@ -73,11 +88,28 @@ export default function Atletas({ atletas, recarregar, diretor }) {
     <section className="tela on">
       <div className="row sb" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Atletas</h2>
-        <span className="tag">{atletas.length} atletas{noDM ? ` · ${noDM} no DM` : ''}{afastados ? ` · ${afastados} afastado${afastados > 1 ? 's' : ''}` : ''}</span>
+        <span className="tag">
+          {filtrando ? `${lista.length} de ${atletas.length}` : `${atletas.length} atletas`}
+          {!filtrando && noDM ? ` · ${noDM} no DM` : ''}
+          {!filtrando && afastados ? ` · ${afastados} afastado${afastados > 1 ? 's' : ''}` : ''}
+        </span>
+      </div>
+
+      <div className="filtros">
+        <div className="fl">
+          {POS.map((p) => <button key={p} className={fPos === p ? 'on' : ''} onClick={() => setFPos(fPos === p ? null : p)}>{p}</button>)}
+          <button className="ord" onClick={() => setOrdem(ordem === 'nome' ? 'posicao' : ordem === 'posicao' ? 'aniv' : 'nome')} title="Mudar a ordem">⇅ {ORD[ordem]}</button>
+        </div>
+        <div className="fl">
+          {[['apto', 'Disponíveis'], ['dm', '🏥 DM'], ['afastado', '⏸ Afastados']].map(([k, nome]) => (
+            <button key={k} className={fSit === k ? 'on' : ''} onClick={() => setFSit(fSit === k ? null : k)}>{nome}</button>
+          ))}
+          {filtrando && <button className="limpa" onClick={() => { setFPos(null); setFSit(null) }}>limpar</button>}
+        </div>
       </div>
       <div className="card">
         <div className="lista">
-          {atletas.map((a) => (
+          {lista.map((a) => (
             <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`}>
               <div className="av">{ini(a.nome)}</div>
               <div className="nome" onClick={() => abrirEditar(a)} style={{ cursor: diretor ? 'pointer' : 'default' }}>
@@ -91,7 +123,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
               {diretor && <button className="more" onClick={() => setMenu(a)}>⋯</button>}
             </div>
           ))}
-          {!atletas.length && <p className="dica">Nenhum atleta ainda.</p>}
+          {!lista.length && <p className="dica">{atletas.length ? 'Nenhum atleta com esses filtros.' : 'Nenhum atleta ainda.'}</p>}
         </div>
       </div>
       {diretor && <button className="fab" onClick={() => setForm({ ...vazio })}>+</button>}

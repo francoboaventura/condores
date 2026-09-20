@@ -22,6 +22,8 @@ function Shell() {
   const [perfil, setPerfil] = useState(null)
   const [tela, setTela] = useState('atletas')
   const [msgTipo, setMsgTipo] = useState('lista')
+  const [origem, setOrigem] = useState(null)      // de onde a pessoa veio para a tela de Mensagens
+  const [rodadaPasso, setRodadaPasso] = useState(1)
   const [atletas, setAtletas] = useState([])
 
   useEffect(() => {
@@ -50,13 +52,17 @@ function Shell() {
 
   useEffect(() => { if (sessao) carregarPerfil(); else setPerfil(null) }, [sessao])
   useEffect(() => { if (perfil?.liberado) recarregarAtletas() }, [perfil])
+  // ao trocar de tela, volta para o topo (senão a pessoa cai no meio da página)
+  useEffect(() => { window.scrollTo(0, 0) }, [tela])
 
   if (sessao === undefined) return <div className="app" />
   if (!sessao) return <div className="app"><Login token={tokenDaUrl()} /></div>
   if (!perfil) return <div className="app" />
   if (!perfil.liberado) return <div className="app"><SemAcesso email={perfil.email} onSair={() => supabase.auth.signOut()} /></div>
 
-  const irParaMsg = (t) => { setMsgTipo(t); setTela('msg') }
+  const irParaMsg = (t, de) => { setMsgTipo(t); if (de) { setOrigem(de); if (de.passo) setRodadaPasso(de.passo) } else setOrigem(null); setTela('msg') }
+  const voltar = () => { if (!origem) return; setTela(origem.tela); setOrigem(null) }
+  const trocarTela = (k) => { setTela(k); if (k !== 'msg') setOrigem(null) }
   const abas = [['atletas', 'Atletas'], ['rodada', 'Rodada'], ['ranking', 'Ranking'], ['msg', 'WhatsApp']]
 
   return (
@@ -68,13 +74,13 @@ function Shell() {
       </header>
       <main>
         {tela === 'atletas' && <Atletas atletas={atletas} recarregar={recarregarAtletas} diretor={perfil.diretor} />}
-        {tela === 'rodada' && <Rodada atletas={atletas} diretor={perfil.diretor} meuAtletaId={perfil.atleta_id} irParaMsg={irParaMsg} irParaRanking={() => setTela('ranking')} />}
+        {tela === 'rodada' && <Rodada atletas={atletas} diretor={perfil.diretor} meuAtletaId={perfil.atleta_id} passoInicial={rodadaPasso} onPasso={setRodadaPasso} irParaMsg={irParaMsg} irParaRanking={() => setTela('ranking')} />}
         {tela === 'ranking' && <Ranking atletas={atletas} meuNome={perfil.nome} irParaMsg={irParaMsg} />}
-        {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} />}
+        {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} origem={origem} onVoltar={voltar} />}
       </main>
       <nav>
         {abas.map(([k, nome]) => (
-          <button key={k} className={tela === k ? 'on' : ''} onClick={() => setTela(k)}>{Icone[k]}{nome}</button>
+          <button key={k} className={tela === k ? 'on' : ''} onClick={() => trocarTela(k)}>{Icone[k]}{nome}</button>
         ))}
       </nav>
     </div>

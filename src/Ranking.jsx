@@ -66,7 +66,7 @@ export default function Ranking({ atletas, meuNome, irParaMsg }) {
               </tbody>
             </table>
           </div>
-          <button className="btn sec" onClick={() => irParaMsg('ranking')}>Gerar ranking pro WhatsApp</button>
+          <button className="btn sec" onClick={() => irParaMsg('ranking', { tela: 'ranking', nome: 'Ranking' })}>Gerar ranking pro WhatsApp</button>
           <p className="dica">Toque num atleta para ver o histórico dele, jogo a jogo.</p>
         </div>
       )}

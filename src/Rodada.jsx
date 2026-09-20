@@ -3,9 +3,10 @@ import { useToast } from './ui'
 import { ini, ddmm, nomeVencedor, temPlacar, tresTimes, proximaSegunda, fora, TIMES, chavesTimes, sortearTimes, POS } from './lib/util'
 import * as db from './lib/dados'
 
-export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irParaRanking }) {
+export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1, onPasso, irParaMsg, irParaRanking }) {
   const toast = useToast()
-  const [passo, setPasso] = useState(1)
+  const [passo, setPassoState] = useState(passoInicial)
+  const setPasso = (n) => { setPassoState(n); onPasso?.(n) }
   const [rodada, setRodada] = useState(null)
   const [conf, setConf] = useState([])           // {rodada_id, atleta_id, status}
   const [esc, setEsc] = useState([])             // linhas de cond_escalacoes
@@ -86,6 +87,12 @@ export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irPar
   const posDe = (e) => (e.convidado_nome ? e.convidado_pos || 'conv.' : atletas.find((a) => a.id === e.atleta_id)?.posicao || '')
   const baseBanco = passada ? ativos.map((a) => a.id) : sim
   const semTime = baseBanco.filter((id) => !esc.some((e) => e.atleta_id === id)).map((id) => atletas.find((a) => a.id === id)).filter(Boolean)
+  // banco agrupado por posição: goleiros em cima, depois ZAG / MEI / ATA em colunas
+  const bancoTodos = [
+    ...semTime.map((a) => ({ key: `a:${a.id}`, nome: a.nome, pos: a.posicao })),
+    ...convBanco.map((c, i) => ({ key: `c:${i}`, nome: c.nome, pos: c.pos, convidado: true, indice: i })),
+  ]
+  const bancoPor = (p) => bancoTodos.filter((j) => j.pos === p)
 
   async function mudarQtdTimes(n) {
     if (!podeEditar) return
@@ -228,6 +235,15 @@ export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irPar
 
   if (carregando) return <section className="tela on"><p className="dica">Carregando rodada…</p></section>
 
+  const Chip = ({ j }) => (
+    <span className={`chip ${j.convidado ? 'conv' : ''} ${j.pos === 'GOL' ? 'g' : ''}`} data-key={j.key}>
+      {j.convidado ? '👤 ' : ''}{j.nome}
+      {j.convidado && (
+        <button className="del" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => tirarConvidadoBanco(j.indice)} title="Remover convidado">×</button>
+      )}
+    </span>
+  )
+
   const Time = ({ t }) => {
     const { nome, emoji, classe, gk } = TIMES[t]
     const gks = esc.filter((e) => e.time === t && e.goleiro)
@@ -306,7 +322,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irPar
                 {a.dm ? <span className="tag dm">DM</span> : a.afastado ? <span className="tag dm">afastado</span> : s === 'S' ? <span className="tag ok">✓ vai</span> : s === 'N' ? <span className="tag nao">✗ não vai</span> : <span className="tag">—</span>}
               </div>) })}
           </div></div>
-          {diretor && <button className="btn" onClick={() => irParaMsg('lista')}>Cobrar quem ainda não confirmou</button>}
+          {diretor && <button className="btn" onClick={() => irParaMsg('lista', { tela: 'rodada', passo: 1, nome: 'Confirmações' })}>Cobrar quem ainda não confirmou</button>}
           {diretor && <p className="dica">Toque no nome para alternar: confirmado → não vai → sem resposta.</p>}
         </div>
       )}
@@ -330,14 +346,28 @@ export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irPar
             <h3>Confirmados sem time {semTime.length + convBanco.length ? `(${semTime.length + convBanco.length})` : ''}</h3>
             <div className="card">
               <div className="banco drop" data-t="">
-                {semTime.map((a) => <span key={a.id} className={`chip ${a.posicao === 'GOL' ? 'g' : ''}`} data-key={`a:${a.id}`}>{a.nome} <small style={{ opacity: .6 }}>{a.posicao}</small></span>)}
-                {convBanco.map((c, i) => (
-                  <span key={`c${i}`} className={`chip conv ${c.pos === 'GOL' ? 'g' : ''}`} data-key={`c:${i}`}>
-                    👤 {c.nome} <small style={{ opacity: .6 }}>{c.pos}</small>
-                    <button className="del" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => tirarConvidadoBanco(i)} title="Remover convidado">×</button>
-                  </span>
-                ))}
-                {!semTime.length && !convBanco.length && <span className="dica" style={{ margin: 0 }}>Todos escalados. Arraste alguém pra cá para tirar do time.</span>}
+                {bancoTodos.length ? (
+                  <>
+                    <div className="banco-gol" data-pos="GOL">
+                      <h5>🧤 Goleiros</h5>
+                      <div className="chips">
+                        {bancoPor('GOL').map((j) => <Chip key={j.key} j={j} />)}
+                        {!bancoPor('GOL').length && <span className="vazio">—</span>}
+                      </div>
+                    </div>
+                    <div className="banco-cols">
+                      {['ZAG', 'MEI', 'ATA'].map((p) => (
+                        <div className="banco-col" key={p} data-pos={p}>
+                          <h5>{p}</h5>
+                          <div className="chips">
+                            {bancoPor(p).map((j) => <Chip key={j.key} j={j} />)}
+                            {!bancoPor(p).length && <span className="vazio">—</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <span className="dica" style={{ margin: 0 }}>Todos escalados. Arraste alguém pra cá para tirar do time.</span>}
               </div>
               <div className="conv-add">
                 <input className="txt" value={convNome} onChange={(e) => setConvNome(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addConvidado()} placeholder="Nome do convidado" />
@@ -352,7 +382,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, irParaMsg, irPar
               <button className="btn sec" onClick={sortear}>Sortear times</button>
               <button className="btn sec" onClick={limpar}>Limpar</button>
             </div>
-            <button className="btn" onClick={() => irParaMsg('escalacao')}>Gerar escalação pro WhatsApp (segunda)</button>
+            <button className="btn" onClick={() => irParaMsg('escalacao', { tela: 'rodada', passo: 2, nome: 'Escalação' })}>Gerar escalação pro WhatsApp (segunda)</button>
             <p className="dica">O sorteio dá um goleiro para cada time e divide zagueiros, meias e atacantes por igual. Arraste para ajustar; a faixa colorida no topo é o gol.{passada ? ' Rodada antiga: não precisa de confirmação — arraste direto da lista de atletas.' : ''}</p>
           </>}
           {!podeEditar && !esc.length && <p className="dica">Escalação ainda não definida.</p>}

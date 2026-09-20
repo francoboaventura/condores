@@ -55,6 +55,27 @@ async def main():
             await pg.click('.fab'); await pg.fill('.modal input.txt >> nth=0', 'Zé Teste'); await pg.fill('.modal input.txt >> nth=1', '05/06'); await pg.click('.modal button:has-text("Salvar")')
             await pg.wait_for_timeout(300); assert await pg.locator('.item:has-text("Zé Teste")').count() == 1
 
+            # ---- filtros e ordenação ----
+            total = await pg.locator('.card .item').count()
+            await pg.click('.filtros button:has-text("GOL")'); await pg.wait_for_timeout(300)
+            gols = await pg.locator('.card .item').count()
+            assert 0 < gols < total, (gols, total)
+            assert all(p == 'GOL' for p in await pg.locator('.card .item .posbtn').all_inner_texts())
+            await pg.click('.filtros button:has-text("GOL")'); await pg.wait_for_timeout(200)
+            await pg.click('.filtros button:has-text("Disponíveis")'); await pg.wait_for_timeout(300)
+            assert await pg.locator('.card .item.dm').count() == 0
+            await pg.click('.filtros button:has-text("DM")'); await pg.wait_for_timeout(300)
+            assert await pg.locator('.card .item').count() == 1 and await pg.locator('.card .item.dm').count() == 1
+            await pg.screenshot(path='test/t13-filtros.png')
+            await pg.click('.filtros button.limpa'); await pg.wait_for_timeout(300)
+            assert await pg.locator('.card .item').count() == total
+            primeiro = await pg.locator('.card .item .nome').first.inner_text()
+            await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # por posição
+            assert (await pg.locator('.card .item .posbtn').first.inner_text()) == 'GOL'
+            await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # por aniversário
+            await pg.click('.filtros button.ord'); await pg.wait_for_timeout(300)   # volta para A–Z
+            assert (await pg.locator('.card .item .nome').first.inner_text()) == primeiro
+
             # ---- rodada próxima: confirmações e escalação ----
             await aba(pg, 1); await pg.wait_for_selector('.stat')
             assert 'antiga' in await pg.locator('#root .dica').first.inner_text()
@@ -77,10 +98,11 @@ async def main():
                 assert abs(pP.count(pos) - pB.count(pos)) <= 1, (pos, pP, pB)
             await pg.fill('input[placeholder="Nome do convidado"]', 'Beto')
             await pg.select_option('.conv-add select', 'ATA'); await pg.click('.conv-add button')
-            assert 'ATA' in await pg.locator('.banco .chip:has-text("Beto")').inner_text()
+            assert await pg.locator('.banco-col[data-pos="ATA"] .chip:has-text("Beto")').count() == 1
+            assert await pg.locator('.banco-gol').count() == 1 and await pg.locator('.banco-col').count() == 3
             # apagar convidado direto do banco
             await pg.fill('input[placeholder="Nome do convidado"]', 'Descartado'); await pg.click('.conv-add button')
-            await pg.locator('.banco .chip:has-text("Descartado") .del').click(); await pg.wait_for_timeout(200)
+            await pg.locator('.banco-col[data-pos="MEI"] .chip:has-text("Descartado") .del').click(); await pg.wait_for_timeout(200)
             assert await pg.locator('.banco .chip:has-text("Descartado")').count() == 0
             await drag(pg, '.chip:has-text("Beto")', '.time.bege .linha')
             await pg.wait_for_timeout(400); await pg.screenshot(path='test/t3-esc.png')
@@ -95,6 +117,14 @@ async def main():
             assert await pg.locator('.time.bege .j:has-text("Beto")').count() == 1
             await drag(pg, '.time.preto .linha .j', '.banco')
             assert await pg.locator('.banco .chip').count() >= 1
+
+            # ---- caminho de volta (breadcrumb) ----
+            await pg.click('text=Gerar escalação pro WhatsApp'); await pg.wait_for_selector('pre.msg')
+            assert 'Escalação' in await pg.locator('.migalhas').inner_text()
+            await pg.screenshot(path='test/t14-migalhas.png')
+            assert (await pg.locator('.migalhas button').first.bounding_box())['y'] < 200  # fica no topo, acima do título
+            await pg.locator('.migalhas button').first.click(); await pg.wait_for_selector('.times')
+            assert await pg.locator('#root .seg button').nth(1).get_attribute('class') == 'on'  # voltou no passo Escalação
 
 
             # ---- rodada antiga a lançar ----
@@ -123,7 +153,7 @@ async def main():
 
             # ---- convite ----
             await aba(pg, 0); await pg.wait_for_selector('.item')
-            await pg.locator('.item:has-text("Rodrigo") button[title]').click(); await pg.click('text=Usuário comum'); await pg.wait_for_selector('pre.msg')
+            await pg.locator('.item:has-text("Rodrigo") button[title="Convidar para o app"]').click(); await pg.click('text=Usuário comum'); await pg.wait_for_selector('pre.msg')
             texto = await pg.locator('pre.msg').inner_text(); assert '#/convite/' in texto and 'Rodrigo' in texto, texto
             token = texto.split('#/convite/')[1].split()[0]
             await pg.screenshot(path='test/t9-convite.png'); await pg.click('text=Fechar')
@@ -134,7 +164,7 @@ async def main():
             await pg.fill('input[type=email]', 'rodrigo@teste.com'); await pg.fill('input[type=password]', 'senha123'); await pg.click('button.btn:has-text("Criar conta")')
             await pg.wait_for_selector('nav'); await pg.wait_for_timeout(500)
             usr = await pg.locator('header .usr').inner_text(); assert 'Rodrigo' in usr and 'atleta' in usr, usr
-            assert await pg.locator('.fab').count() == 0 and await pg.locator('button[title]').count() == 0
+            assert await pg.locator('.fab').count() == 0 and await pg.locator('button[title="Convidar para o app"]').count() == 0
             await aba(pg, 1); await pg.wait_for_selector('.stat')
             await pg.locator('#root .item:has-text("Rodrigo")').click(); await pg.wait_for_timeout(300)
             assert '✓ vai' in await pg.locator('#root .item:has-text("Rodrigo")').inner_text()
@@ -146,7 +176,8 @@ async def main():
 
             # ---- diretor volta, fecha a rodada e confere ranking e mensagens ----
             await pg.click('header a:has-text("sair")'); await login(pg, 'francoboaventura@icloud.com', '123456')
-            await aba(pg, 1); await pg.wait_for_selector('.stat')
+            await aba(pg, 1)
+            await pg.locator('#root .seg button').nth(0).click(); await pg.wait_for_selector('.stat')  # o app lembra o último passo
             await pg.locator('#root .seg button').nth(2).click(); await pg.fill('.placar input >> nth=0', '3'); await pg.fill('.placar input >> nth=1', '1')
             await pg.click('text=Salvar resultado e pontuar'); await pg.wait_for_selector('table'); await pg.wait_for_timeout(500)
             await pg.screenshot(path='test/t4-rank.png')
