@@ -176,3 +176,14 @@ header .usr a{display:block;font-size:11px;text-decoration:underline;margin-top:
 .migalhas button{background:none;border:0;color:var(--bege);font-size:12px;font-weight:600;cursor:pointer;padding:2px 0;text-decoration:underline}
 .migalhas span{color:var(--mudo)}
 .migalhas b{color:var(--mudo);font-weight:600}
+
+/* caixas de contagem que abrem a lista de nomes */
+.stat .card{border:1px solid var(--linha);cursor:pointer;font:inherit;color:inherit;position:relative}
+.stat .card.on{border-color:var(--bege);background:#191509}
+.stat .card small{display:block;font-size:10px;color:var(--mudo)}
+.detalhe h5{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--bege);margin:0}
+.detalhe .fechar{background:none;border:0;color:var(--mudo);font-size:12px;text-decoration:underline;cursor:pointer}
+.detalhe ul{list-style:none;columns:2;column-gap:14px}
+.detalhe li{font-size:13px;padding:3px 0;break-inside:avoid;display:flex;align-items:center;gap:5px}
+.detalhe li small{color:var(--mudo);font-size:10px}
+.detalhe li .tag{padding:1px 6px;font-size:9px}

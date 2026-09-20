@@ -20,6 +20,10 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 Filtros por posição (GOL/ZAG/MEI/ATA) e por situação (disponíveis / DM / afastados), com botão ⇅ para alternar a ordem entre A–Z, posição e aniversário.
 
+## Confirmações
+
+As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao toque e listam os nomes, com a posição de cada um; em "Não vão" aparecem também os que estão no DM ou afastados, com a etiqueta.
+
 ## Escalação
 
 - Sorteio equilibrado: um goleiro por time e zagueiros, meias e atacantes divididos por igual. Se faltar goleiro, a faixa fica vazia e o app avisa.

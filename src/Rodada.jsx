@@ -24,6 +24,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   const [outraData, setOutraData] = useState('')
   const [rodadaId, setRodadaId] = useState(null)
   const [semGoleiro, setSemGoleiro] = useState([])
+  const [detalhe, setDetalhe] = useState(null)   // 'sim' | 'nao' | 'pend' — caixa aberta nas confirmações
 
   const fechada = rodada?.status === 'encerrada'
   const passada = rodada && rodada.data < proximaSegunda()
@@ -68,6 +69,18 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   const indisponiveis = atletas.filter((a) => fora(a)).length   // DM + afastamento justificado
   const naoVao = nao + indisponiveis
   const pend = ativos.length - sim.length - nao
+
+  const porId = (id) => atletas.find((a) => a.id === id)
+  const listaDetalhe = {
+    sim: sim.map(porId).filter(Boolean).map((a) => ({ nome: a.nome, pos: a.posicao })),
+    nao: [
+      ...conf.filter((c) => c.status === 'N').map((c) => porId(c.atleta_id)).filter(Boolean).map((a) => ({ nome: a.nome, pos: a.posicao })),
+      ...atletas.filter((a) => a.dm).map((a) => ({ nome: a.nome, pos: a.posicao, tag: 'DM' })),
+      ...atletas.filter((a) => a.afastado).map((a) => ({ nome: a.nome, pos: a.posicao, tag: 'afastado' })),
+    ],
+    pend: ativos.filter((a) => !statusDe(a.id)).map((a) => ({ nome: a.nome, pos: a.posicao })),
+  }
+  const TITULO = { sim: 'Confirmados', nao: 'Não vão', pend: 'Sem resposta' }
 
   function alternar(a) {
     if (fechada) return toast('Rodada encerrada')
@@ -310,10 +323,32 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
       {passo === 1 && (
         <div>
           <div className="stat">
-            <div className="card"><b>{sim.length}</b><span>Confirmados</span></div>
-            <div className="card"><b>{naoVao}</b><span>Não vão</span>{indisponiveis > 0 && <small style={{ display: 'block', fontSize: 10, color: 'var(--mudo)' }}>{indisponiveis} DM/afast.</small>}</div>
-            <div className="card"><b>{pend}</b><span>Sem resposta</span></div>
+            <button className={`card ${detalhe === 'sim' ? 'on' : ''}`} onClick={() => setDetalhe(detalhe === 'sim' ? null : 'sim')}>
+              <b>{sim.length}</b><span>Confirmados</span>
+            </button>
+            <button className={`card ${detalhe === 'nao' ? 'on' : ''}`} onClick={() => setDetalhe(detalhe === 'nao' ? null : 'nao')}>
+              <b>{naoVao}</b><span>Não vão</span>
+              {indisponiveis > 0 && <small>{indisponiveis} DM/afast.</small>}
+            </button>
+            <button className={`card ${detalhe === 'pend' ? 'on' : ''}`} onClick={() => setDetalhe(detalhe === 'pend' ? null : 'pend')}>
+              <b>{pend}</b><span>Sem resposta</span>
+            </button>
           </div>
+          {detalhe && (
+            <div className="card detalhe">
+              <div className="row sb" style={{ marginBottom: 8 }}>
+                <h5>{TITULO[detalhe]} ({listaDetalhe[detalhe].length})</h5>
+                <button className="fechar" onClick={() => setDetalhe(null)}>fechar</button>
+              </div>
+              {listaDetalhe[detalhe].length ? (
+                <ul>
+                  {listaDetalhe[detalhe].map((j, i) => (
+                    <li key={j.nome + i}>{i + 1}. {j.nome} <small>{j.pos}</small>{j.tag && <span className="tag dm">{j.tag}</span>}</li>
+                  ))}
+                </ul>
+              ) : <p className="dica" style={{ margin: 0 }}>Ninguém por aqui.</p>}
+            </div>
+          )}
           <div className="card"><div className="lista">
             {atletas.map((a) => { const s = statusDe(a.id); return (
               <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`} onClick={() => alternar(a)} style={{ cursor: diretor || a.id === meuAtletaId ? 'pointer' : 'default', background: a.id === meuAtletaId ? '#151306' : undefined }}>

@@ -87,6 +87,19 @@ async def main():
             naovao = await pg.locator('.stat b').nth(1).inner_text(); assert naovao == '2', naovao  # 1 no DM + 1 afastado
             assert 'DM/afast' in await pg.locator('.stat .card').nth(1).inner_text()
             assert 'AFASTADO' in (await pg.locator('#root .item').nth(5).inner_text()).upper()
+            # caixas de contagem abrem a lista de nomes
+            await pg.locator('.stat .card').nth(1).click(); await pg.wait_for_selector('.detalhe')
+            det = await pg.locator('.detalhe').inner_text()
+            assert 'DM' in det and 'afastado' in det, det
+            assert await pg.locator('.detalhe li').count() == 2
+            await pg.locator('.stat .card').nth(0).click(); await pg.wait_for_timeout(200)
+            assert await pg.locator('.detalhe li').count() == int(sim)
+            assert 'CONFIRMADOS' in (await pg.locator('.detalhe h5').inner_text()).upper()
+            await pg.screenshot(path='test/t15-detalhe.png')
+            await pg.locator('.stat .card').nth(2).click(); await pg.wait_for_timeout(200)
+            assert await pg.locator('.detalhe li').count() == int(await pg.locator('.stat b').nth(2).inner_text())
+            await pg.click('.detalhe .fechar'); await pg.wait_for_timeout(200)
+            assert await pg.locator('.detalhe').count() == 0
             await pg.locator('#root .seg button').nth(1).click(); await pg.wait_for_selector('.times')
             await pg.click('text=Sortear times'); await pg.wait_for_timeout(600)
             assert await pg.locator('.time.preto .gk .j').count() == 1 and await pg.locator('.time.bege .gk .j').count() == 1
