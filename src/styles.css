@@ -126,3 +126,28 @@ header .usr a{display:block;font-size:11px;text-decoration:underline;margin-top:
 .btn:disabled{opacity:.6}
 #root{width:100%;max-width:430px;display:flex;flex-direction:column}
 #login{min-height:100vh;position:relative}
+
+/* terceiro time (vermelho) */
+:root{--vermelho:#a32a2a;--azul:#2f6fd0}
+.time.vermelho{background:#2a0f0f;border:1px solid var(--vermelho)}
+.time.vermelho .j{border-color:rgba(255,255,255,.18)}
+.gk.azul{background:var(--azul);color:#fff}
+.gk.azul.vazio{background:transparent}
+.time.vermelho .gk.vazio{color:var(--azul);opacity:1}
+.times.tres{grid-template-columns:repeat(3,1fr);gap:6px}
+.times.tres .time{padding:7px;min-height:170px}
+.times.tres .time h4{font-size:10px;letter-spacing:.04em}
+.times.tres .j{font-size:12px;padding:5px 2px;gap:3px}
+.times.tres .j .x{display:none}
+.times.tres .gk{font-size:11px;padding:5px 6px}
+.qtd-times{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.qtd-times span{color:var(--mudo);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.qtd-times button{flex:none;padding:6px 12px;border-radius:8px;border:1px solid var(--linha);background:var(--preto3);color:var(--txt);font-size:13px;font-weight:600;cursor:pointer}
+.qtd-times button.on{background:var(--bege);color:#111;border-color:var(--bege)}
+.aviso{background:#3a2a12;color:#f0c27a;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:10px;line-height:1.4}
+.podio button{flex:1;padding:12px 6px;border-radius:10px;border:1px solid var(--linha);background:var(--preto3);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer}
+.podio button.on{background:var(--bege);color:#111;border-color:var(--bege)}
+.del{background:none;border:0;color:var(--vermelho);font-size:17px;line-height:1;padding:0 2px;margin-left:auto;cursor:pointer;flex:none;opacity:.85}
+.time.bege .del{color:#8a1f1f}
+.banco .del{margin-left:2px;color:#c05555}
+.times.tres .del{font-size:15px}

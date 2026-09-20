@@ -16,6 +16,12 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 - **Atleta (usuário comum)**: vê tudo e confirma a própria presença.
 - Convite: na tela Atletas, o ✉ ao lado do nome gera um link pessoal (usuário comum ou diretor). Quem abre cria e-mail + senha e a conta já nasce ligada à ficha.
 
+## Escalação
+
+- Sorteio equilibrado: um goleiro por time e zagueiros, meias e atacantes divididos por igual. Se faltar goleiro, a faixa fica vazia e o app avisa.
+- Botão **2 / 3 times**: o terceiro time é o Vermelho (goleiro de colete azul). Com 3 times o resultado é campeão (3 pts) e 2º lugar (1 pt); com 2 times segue placar ou vencedor (3/1/0).
+- Convidado entra só na rodada, com posição escolhida na hora (conta no sorteio, não pontua).
+
 ## Histórico
 
 As 26 rodadas preenchidas na planilha "Condores 2026" foram importadas (`dados/importar-planilha.sql`, gerado a partir de `dados/condores-2026.csv`). Rodadas sem resultado aparecem como "a lançar" na tela Rodada (toque na data).

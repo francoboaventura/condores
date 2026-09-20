@@ -62,7 +62,12 @@ export const salvarResultado = (id, gols_preto, gols_bege) =>
   ok(supabase.from('cond_rodadas').update({ gols_preto, gols_bege, status: 'encerrada' }).eq('id', id))
 // resultado sem placar (só quem venceu)
 export const salvarVencedor = (id, vencedor) =>
-  ok(supabase.from('cond_rodadas').update({ gols_preto: null, gols_bege: null, vencedor, status: 'encerrada' }).eq('id', id))
+  ok(supabase.from('cond_rodadas').update({ gols_preto: null, gols_bege: null, vencedor, vice: null, status: 'encerrada' }).eq('id', id))
+// resultado com 3 times: campeão e vice
+export const salvarPodio = (id, vencedor, vice) =>
+  ok(supabase.from('cond_rodadas').update({ vencedor, vice, status: 'encerrada' }).eq('id', id))
+// 2 ou 3 times nesta rodada
+export const setTimesQtd = (id, times_qtd) => ok(supabase.from('cond_rodadas').update({ times_qtd }).eq('id', id))
 
 export const listarRodadasEncerradas = () =>
   ok(

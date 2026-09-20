@@ -1,6 +1,6 @@
-import { ddmm } from './util'
+import { ddmm, TIMES, chavesTimes, tresTimes } from './util'
 
-// Lista de sexta: só quem ainda não respondeu (DM não entra)
+// Lista de sexta: só quem ainda não respondeu (DM e afastados não entram)
 export function msgFaltam(rodada, atletas, confirmacoes) {
   const resp = new Set(confirmacoes.map((c) => c.atleta_id))
   const pend = atletas.filter((a) => !a.dm && !a.afastado && !resp.has(a.id)).map((a) => a.nome)
@@ -11,7 +11,7 @@ export function msgFaltam(rodada, atletas, confirmacoes) {
 // Escalação de segunda: goleiro primeiro, linha numerada, convidados marcados
 export function msgEscalacao(rodada, atletas, escalacao) {
   const nome = (e) => {
-    if (e.convidado_nome) return `${e.convidado_nome} (convidado)`
+    if (e.convidado_nome) return `${e.convidado_nome} (convidado${e.convidado_pos ? `, ${e.convidado_pos}` : ''})`
     const a = atletas.find((x) => x.id === e.atleta_id)
     return a ? `${a.nome} (${a.posicao})` : '?'
   }
@@ -20,7 +20,10 @@ export function msgEscalacao(rodada, atletas, escalacao) {
     const lin = escalacao.filter((e) => e.time === t && !e.goleiro).map((e, i) => `${i + 1}. ${nome(e)}`)
     return [...gk, ...lin].join('\n') || '—'
   }
-  return `🦅 *ESCALAÇÃO — Segunda ${ddmm(rodada.data)}*\n🕗 20h · Radar\n\n⚫ *PRETO*\n${bloco('P')}\n\n🟡 *BEGE*\n${bloco('B')}\n\nBom jogo, Condores! 🏆`
+  const times = chavesTimes(rodada.times_qtd)
+    .map((t) => `${TIMES[t].emoji} *${TIMES[t].nome.toUpperCase()}*\n${bloco(t)}`)
+    .join('\n\n')
+  return `🦅 *ESCALAÇÃO — Segunda ${ddmm(rodada.data)}*\n🕗 20h · Radar${tresTimes(rodada) ? '\n(rodada com 3 times)' : ''}\n\n${times}\n\nBom jogo, Condores! 🏆`
 }
 
 export function msgRanking(rank, total) {

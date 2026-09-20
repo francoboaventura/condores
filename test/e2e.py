@@ -50,7 +50,7 @@ async def main():
             assert (await pg.locator('.posbtn').first.inner_text()) == 'ZAG'
             await pg.locator('.item').nth(2).locator('.more:not([title])').click(); await pg.click('text=Enviar para o DM'); await pg.wait_for_timeout(300)
             assert 'no DM' in await pg.locator('.tag').first.inner_text()
-            await pg.locator('.item').nth(4).locator('.more:not([title])').click(); await pg.click('text=Afastamento justificado'); await pg.wait_for_timeout(300)
+            await pg.locator('.item').nth(5).locator('.more:not([title])').click(); await pg.click('text=Afastamento justificado'); await pg.wait_for_timeout(300)
             assert 'afastado' in await pg.locator('.tag').first.inner_text()
             await pg.click('.fab'); await pg.fill('.modal input.txt >> nth=0', 'Zé Teste'); await pg.fill('.modal input.txt >> nth=1', '05/06'); await pg.click('.modal button:has-text("Salvar")')
             await pg.wait_for_timeout(300); assert await pg.locator('.item:has-text("Zé Teste")').count() == 1
@@ -60,26 +60,66 @@ async def main():
             assert 'antiga' in await pg.locator('#root .dica').first.inner_text()
             itens = pg.locator('#root .item')
             for i in range(14): await itens.nth(i).click(); await pg.wait_for_timeout(120)
+            await pg.locator('#root .item:has-text("Pico")').click(); await pg.wait_for_timeout(200)  # 2º goleiro
             await pg.wait_for_timeout(300); await pg.screenshot(path='test/t2-conf.png')
             sim = await pg.locator('.stat b').first.inner_text(); assert int(sim) >= 11, sim
-            assert 'AFASTADO' in (await pg.locator('#root .item').nth(4).inner_text()).upper()
+            naovao = await pg.locator('.stat b').nth(1).inner_text(); assert naovao == '2', naovao  # 1 no DM + 1 afastado
+            assert 'DM/afast' in await pg.locator('.stat .card').nth(1).inner_text()
+            assert 'AFASTADO' in (await pg.locator('#root .item').nth(5).inner_text()).upper()
             await pg.locator('#root .seg button').nth(1).click(); await pg.wait_for_selector('.times')
-            await pg.click('text=Sortear times'); await pg.wait_for_timeout(500)
-            await pg.fill('input[placeholder="Nome do convidado"]', 'Beto'); await pg.click('text=+ Convidado')
+            await pg.click('text=Sortear times'); await pg.wait_for_timeout(600)
+            assert await pg.locator('.time.preto .gk .j').count() == 1 and await pg.locator('.time.bege .gk .j').count() == 1
+            async def posicoes(sel):
+                txt = await pg.locator(sel).all_inner_texts()
+                return [t.split()[-2] if t.split()[-1] == '⇄' else t.split()[-1] for t in txt]
+            pP, pB = await posicoes('.time.preto .linha .j'), await posicoes('.time.bege .linha .j')
+            for pos in ('ZAG', 'MEI', 'ATA'):
+                assert abs(pP.count(pos) - pB.count(pos)) <= 1, (pos, pP, pB)
+            await pg.fill('input[placeholder="Nome do convidado"]', 'Beto')
+            await pg.select_option('.conv-add select', 'ATA'); await pg.click('.conv-add button')
+            assert 'ATA' in await pg.locator('.banco .chip:has-text("Beto")').inner_text()
+            # apagar convidado direto do banco
+            await pg.fill('input[placeholder="Nome do convidado"]', 'Descartado'); await pg.click('.conv-add button')
+            await pg.locator('.banco .chip:has-text("Descartado") .del').click(); await pg.wait_for_timeout(200)
+            assert await pg.locator('.banco .chip:has-text("Descartado")').count() == 0
             await drag(pg, '.chip:has-text("Beto")', '.time.bege .linha')
             await pg.wait_for_timeout(400); await pg.screenshot(path='test/t3-esc.png')
             assert await pg.locator('.time.bege .j:has-text("Beto")').count() == 1
+            # apagar convidado já escalado e recolocar
+            await pg.locator('.time.bege .j:has-text("Beto") .del').click(); await pg.wait_for_timeout(400)
+            assert await pg.locator('.j:has-text("Beto")').count() == 0 and await pg.locator('.chip:has-text("Beto")').count() == 0
+            await pg.fill('input[placeholder="Nome do convidado"]', 'Beto')
+            await pg.select_option('.conv-add select', 'ATA'); await pg.click('.conv-add button')
+            await drag(pg, '.chip:has-text("Beto")', '.time.bege .linha')
+            await pg.wait_for_timeout(400)
+            assert await pg.locator('.time.bege .j:has-text("Beto")').count() == 1
             await drag(pg, '.time.preto .linha .j', '.banco')
             assert await pg.locator('.banco .chip').count() >= 1
+
 
             # ---- rodada antiga a lançar ----
             await pg.click('#root button.tag.preto'); await pg.click('.sheet button:has-text("a lançar")')
             await pg.wait_for_selector('#root button.tag.preto:has-text("a lançar")'); await pg.wait_for_selector('.times')
             await pg.click('text=Sortear times'); await pg.wait_for_timeout(500)
             assert await pg.locator('.time .j').count() >= 10
-            await pg.locator('#root .seg button').nth(2).click(); await pg.click('text=🟡 Bege'); await pg.wait_for_selector('table'); await pg.wait_for_timeout(400)
             await pg.screenshot(path='test/t8-antiga.png')
+
+            # ---- 3 times (Preto, Bege e Vermelho) na mesma rodada antiga ----
+            await pg.click('.qtd-times button:has-text("3")'); await pg.wait_for_timeout(500)
+            assert await pg.locator('.time.vermelho').count() == 1
+            await pg.click('text=Sortear times'); await pg.wait_for_timeout(600)
+            assert 'Sem goleiro' in await pg.locator('.aviso').inner_text()  # só 2 goleiros para 3 times
+            n = [await pg.locator(f'.time.{c} .j').count() for c in ('preto', 'bege', 'vermelho')]
+            assert max(n) - min(n) <= 1, n
+            await pg.screenshot(path='test/t11-tres.png')
+            await pg.locator('#root .seg button').nth(2).click(); await pg.wait_for_selector('.podio')
+            await pg.click('.podio button:has-text("Vermelho") >> nth=0')
+            await pg.click('.podio button:has-text("Bege") >> nth=1')
+            await pg.click('text=Salvar resultado e pontuar'); await pg.wait_for_selector('table'); await pg.wait_for_timeout(500)
             assert '1 rodadas' in await pg.locator('section .tag').first.inner_text()
+            await pg.locator('tbody tr').first.click(); await pg.wait_for_selector('.modal')
+            ht = await pg.locator('.modal table').inner_text(); assert '1º lugar' in ht, ht
+            await pg.screenshot(path='test/t12-podio.png'); await pg.click('text=Fechar')
 
             # ---- convite ----
             await aba(pg, 0); await pg.wait_for_selector('.item')
@@ -108,7 +148,7 @@ async def main():
             await pg.click('header a:has-text("sair")'); await login(pg, 'francoboaventura@icloud.com', '123456')
             await aba(pg, 1); await pg.wait_for_selector('.stat')
             await pg.locator('#root .seg button').nth(2).click(); await pg.fill('.placar input >> nth=0', '3'); await pg.fill('.placar input >> nth=1', '1')
-            await pg.click('text=Salvar resultado e pontuar'); await pg.wait_for_selector('table'); await pg.wait_for_timeout(400)
+            await pg.click('text=Salvar resultado e pontuar'); await pg.wait_for_selector('table'); await pg.wait_for_timeout(500)
             await pg.screenshot(path='test/t4-rank.png')
             assert '2 rodadas' in await pg.locator('section .tag').first.inner_text()
             await pg.locator('tbody tr').first.click(); await pg.wait_for_selector('.modal'); await pg.screenshot(path='test/t5-hist.png')
@@ -117,10 +157,10 @@ async def main():
             await aba(pg, 3); await pg.wait_for_selector('pre.msg'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'Ainda não confirmaram' in t, t
             await pg.click('text=Escalação (seg)'); await pg.wait_for_timeout(400)
-            t = await pg.locator('pre.msg').inner_text(); assert 'Beto (convidado)' in t and '🧤' in t, t
+            t = await pg.locator('pre.msg').inner_text(); assert 'Beto (convidado, ATA)' in t and '🧤' in t, t
             await pg.screenshot(path='test/t7-msg.png')
             await pg.click('text=Ranking'); await pg.wait_for_timeout(400)
-            t = await pg.locator('pre.msg').inner_text(); assert '2 rodadas' in t, t
+            t = await pg.locator('pre.msg').inner_text(); assert 'RANKING CONDORES' in t, t
             print('ERROS:', erros)
             assert not erros, erros
             await b.close()
