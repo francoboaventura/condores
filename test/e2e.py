@@ -218,6 +218,28 @@ async def main():
             await pg.click('text=Ranking'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'RANKING CONDORES' in t, t
 
+            # ---- encerrar o ano e destacar o campeão ----
+            await aba(pg, 2); await pg.wait_for_selector('table')
+            campeao = await pg.locator('#root tbody tr td').nth(1).inner_text()
+            pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
+            await pg.click('text=Encerrar o ano'); await pg.wait_for_selector('.campeao-faixa')
+            await pg.screenshot(path='test/t17-temporada.png')
+            faixa = await pg.locator('.campeao-faixa').text_content()
+            assert campeao in faixa and 'encerrada' in faixa, faixa
+            assert await pg.locator('text=Reabrir').count() == 1
+            # destaque na tela inicial
+            await aba(pg, 0); await pg.wait_for_selector('.campeao-faixa.home')
+            assert campeao in await pg.locator('.campeao-faixa.home').text_content()
+            await pg.screenshot(path='test/t18-campeao-home.png')
+            await pg.click('.campeao-faixa.home'); await pg.wait_for_selector('table')  # leva ao ranking
+            # reabrir devolve o ranking ao vivo
+            pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
+            await pg.click('text=Reabrir'); await pg.wait_for_timeout(800)
+            assert await pg.locator('.campeao-faixa').count() == 0
+            await aba(pg, 0); await pg.wait_for_selector('.item')
+            assert await pg.locator('.campeao-faixa.home').count() == 0
+            await aba(pg, 2); await pg.wait_for_selector('table')
+
             # ---- "saiu do time": some das listas e do ranking ----
             await aba(pg, 2); await pg.wait_for_selector('table')
             antes = await pg.locator('#root tbody tr').count()

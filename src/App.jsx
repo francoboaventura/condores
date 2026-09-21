@@ -25,6 +25,7 @@ function Shell() {
   const [origem, setOrigem] = useState(null)      // de onde a pessoa veio para a tela de Mensagens
   const [rodadaPasso, setRodadaPasso] = useState(1)
   const [atletas, setAtletas] = useState([])
+  const [temporada, setTemporada] = useState(null)   // última temporada encerrada (destaque do campeão)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSessao(data.session))
@@ -50,8 +51,12 @@ function Shell() {
     try { setAtletas(await db.listarAtletas()) } catch (e) { toast(e.message) }
   }, [])
 
+  const recarregarTemporadas = useCallback(async () => {
+    try { const ts = await db.listarTemporadas(); setTemporada(ts[0] || null) } catch { /* sem temporada encerrada */ }
+  }, [])
+
   useEffect(() => { if (sessao) carregarPerfil(); else setPerfil(null) }, [sessao])
-  useEffect(() => { if (perfil?.liberado) recarregarAtletas() }, [perfil])
+  useEffect(() => { if (perfil?.liberado) { recarregarAtletas(); recarregarTemporadas() } }, [perfil])
   // ao trocar de tela, volta para o topo (senão a pessoa cai no meio da página)
   useEffect(() => { window.scrollTo(0, 0) }, [tela])
 
@@ -73,9 +78,9 @@ function Shell() {
         <div className="usr">{perfil.diretor ? 'diretoria' : 'atleta'}<b>{perfil.nome}</b><a href="#" onClick={(e) => { e.preventDefault(); supabase.auth.signOut() }} style={{ color: 'var(--mudo)' }}>sair</a></div>
       </header>
       <main>
-        {tela === 'atletas' && <Atletas atletas={atletas} recarregar={recarregarAtletas} diretor={perfil.diretor} />}
+        {tela === 'atletas' && <Atletas atletas={atletas} recarregar={recarregarAtletas} diretor={perfil.diretor} temporada={temporada} verRanking={() => setTela('ranking')} />}
         {tela === 'rodada' && <Rodada atletas={atletas} diretor={perfil.diretor} meuAtletaId={perfil.atleta_id} passoInicial={rodadaPasso} onPasso={setRodadaPasso} irParaMsg={irParaMsg} irParaRanking={() => setTela('ranking')} />}
-        {tela === 'ranking' && <Ranking atletas={atletas} meuNome={perfil.nome} irParaMsg={irParaMsg} />}
+        {tela === 'ranking' && <Ranking atletas={atletas} meuNome={perfil.nome} diretor={perfil.diretor} irParaMsg={irParaMsg} aoMudarTemporadas={recarregarTemporadas} />}
         {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} origem={origem} onVoltar={voltar} />}
       </main>
       <nav>

@@ -81,8 +81,28 @@ export const listarRodadasEncerradas = () =>
       .order('data', { ascending: false }),
   )
 
-// ---------- ranking ----------
-export const ranking = () => ok(supabase.from('cond_ranking').select('*').gt('jogos', 0).order('pontos', { ascending: false }).order('jogos', { ascending: false }))
-export const totalRodadas = async () => (await ok(supabase.from('cond_rodadas').select('id').eq('status', 'encerrada'))).length
-export const historicoAtleta = (atleta_id) => ok(supabase.from('cond_historico').select('*').eq('atleta_id', atleta_id).order('data', { ascending: false }))
-export const listarDatasEncerradas = () => ok(supabase.from('cond_rodadas').select('id, data').eq('status', 'encerrada').order('data', { ascending: false }))
+// ---------- ranking / temporadas ----------
+export const anoAtual = () => new Date().getFullYear()
+export const ranking = (ano = anoAtual()) =>
+  ok(supabase.from('cond_ranking_ano').select('*').eq('ano', ano).gt('jogos', 0)
+    .order('pontos', { ascending: false }).order('jogos', { ascending: false }))
+export const totalRodadas = async (ano = anoAtual()) =>
+  (await ok(supabase.from('cond_rodadas').select('data').eq('status', 'encerrada')
+    .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`))).length
+// anos que já tiveram rodadas encerradas
+export async function anosComRodadas() {
+  const linhas = await ok(supabase.from('cond_rodadas').select('data').eq('status', 'encerrada'))
+  const anos = [...new Set(linhas.map((r) => +r.data.slice(0, 4)))].sort((a, b) => b - a)
+  return anos.length ? anos : [anoAtual()]
+}
+export const listarTemporadas = () => ok(supabase.from('cond_temporadas').select('*').order('ano', { ascending: false }))
+export const rankingTemporada = (ano) =>
+  ok(supabase.from('cond_temporada_ranking').select('*').eq('ano', ano).order('posicao_no'))
+export const encerrarAno = (ano) => ok(supabase.rpc('cond_encerrar_ano', { p_ano: ano }))
+export const reabrirAno = (ano) => ok(supabase.rpc('cond_reabrir_ano', { p_ano: ano }))
+export const historicoAtleta = (atleta_id, ano = anoAtual()) =>
+  ok(supabase.from('cond_historico').select('*').eq('atleta_id', atleta_id)
+    .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`).order('data', { ascending: false }))
+export const listarDatasEncerradas = (ano = anoAtual()) =>
+  ok(supabase.from('cond_rodadas').select('id, data').eq('status', 'encerrada')
+    .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`).order('data', { ascending: false }))

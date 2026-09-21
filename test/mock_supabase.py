@@ -18,6 +18,7 @@ DB = {
     'cond_atletas': [dict(id=str(uuid.uuid4()), nome=n, posicao={'Pico':'GOL','Cassio':'GOL','Ivan':'ZAG','Edson':'ZAG','Carlos':'ZAG','Jura':'ZAG','Rafael':'ZAG','Wilson':'ATA','Lucas':'ATA','Alisson':'ATA','Guga':'ATA','Anderson':'ATA'}.get(n,'MEI'), aniv_dia=d, aniv_mes=m,
                           whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True, numero=CAMISA.get(n,(None,None))[0], tamanho=CAMISA.get(n,(None,None))[1]) for n,d,m in nomes],
     'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, vice=None, times_qtd=2, origem='planilha')], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
+    'cond_temporadas': [], 'cond_temporada_ranking': [],
 }
 
 def venc(r):
@@ -43,6 +44,25 @@ def view_ranking():
                         frequencia=(len(js)/len(enc)) if enc else 0, media=(pts/len(js)) if js else 0))
     return out
 
+def ano_de(d): return int(str(d)[:4])
+
+def view_ranking_ano():
+    enc = [r for r in DB['cond_rodadas'] if r['status'] == 'encerrada']
+    anos = sorted({ano_de(r['data']) for r in enc})
+    out = []
+    for ano in anos:
+        rod = [r for r in enc if ano_de(r['data']) == ano]
+        ids = {r['id'] for r in rod}
+        for a in DB['cond_atletas']:
+            js = [(e, next(r for r in rod if r['id'] == e['rodada_id']))
+                  for e in DB['cond_escalacoes'] if e['atleta_id'] == a['id'] and e['rodada_id'] in ids]
+            if not js: continue
+            pts = sum(pontos_de(r, e['time']) for e, r in js)
+            out.append(dict(ano=ano, atleta_id=a['id'], nome=a['nome'], posicao=a['posicao'], dm=a['dm'],
+                            afastado=a['afastado'], ativo=a['ativo'], jogos=len(js), pontos=pts,
+                            frequencia=len(js)/len(rod), media=pts/len(js)))
+    return out
+
 def view_historico():
     enc = {r['id']: r for r in DB['cond_rodadas'] if r['status'] == 'encerrada'}
     return [dict(atleta_id=e['atleta_id'], rodada_id=e['rodada_id'], data=enc[e['rodada_id']]['data'], time=e['time'], goleiro=e['goleiro'],
@@ -59,6 +79,8 @@ def filtrar(rows, qs):
             if op == 'eq': rows = [r for r in rows if str(r.get(k)).lower() == val.lower()]
             elif op == 'gt': rows = [r for r in rows if (r.get(k) or 0) > float(val)]
             elif op == 'lt': rows = [r for r in rows if str(r.get(k)) < val]
+            elif op == 'gte': rows = [r for r in rows if str(r.get(k)) >= val]
+            elif op == 'lte': rows = [r for r in rows if str(r.get(k)) <= val]
             elif op == 'in': rows = [r for r in rows if str(r.get(k)) in val.strip('()').split(',')]
     if 'order' in qs:
         for o in reversed(qs['order'][0].split(',')):
@@ -102,6 +124,27 @@ async def handle(route, request):
         return await send(dict(access_token='tok', token_type='bearer', expires_in=3600, expires_at=9999999999, refresh_token='ref', user=dict(id='u2', email=body['email'], aud='authenticated', role='authenticated')))
     if path.startswith('/auth/v1/logout'):
         return await send({}, 204)
+    if path.startswith('/rest/v1/rpc/cond_encerrar_ano'):
+        ano = body['p_ano']
+        rod = [r for r in DB['cond_rodadas'] if r['status'] == 'encerrada' and ano_de(r['data']) == ano]
+        if not rod: return await send({'message': f'Não há rodadas encerradas em {ano}.'}, 400)
+        linhas = sorted([x for x in view_ranking_ano() if x['ano'] == ano],
+                        key=lambda x: (-x['pontos'], -x['jogos'], x['nome']))
+        DB['cond_temporada_ranking'] = [t for t in DB['cond_temporada_ranking'] if t['ano'] != ano]
+        for i, x in enumerate(linhas, 1):
+            DB['cond_temporada_ranking'].append(dict(ano=ano, posicao_no=i, atleta_id=x['atleta_id'], nome=x['nome'],
+                numero=None, posicao=x['posicao'], jogos=x['jogos'], pontos=x['pontos'],
+                frequencia=x['frequencia'], media=x['media'], dm=False, ativo=True))
+        c = linhas[0]
+        DB['cond_temporadas'] = [t for t in DB['cond_temporadas'] if t['ano'] != ano] + [dict(
+            ano=ano, encerrada_em='agora', total_rodadas=len(rod), campeao_id=c['atleta_id'],
+            campeao_nome=c['nome'], campeao_pontos=c['pontos'], campeao_jogos=c['jogos'])]
+        return await send(dict(ano=ano, campeao=c['nome'], pontos=c['pontos'], rodadas=len(rod)))
+    if path.startswith('/rest/v1/rpc/cond_reabrir_ano'):
+        ano = body['p_ano']
+        DB['cond_temporadas'] = [t for t in DB['cond_temporadas'] if t['ano'] != ano]
+        DB['cond_temporada_ranking'] = [t for t in DB['cond_temporada_ranking'] if t['ano'] != ano]
+        return await send(None)
     if path.startswith('/rest/v1/rpc/cond_ver_convite'):
         c = next((c for c in CONVITES if c['token'] == body['p_token']), None)
         if not c: return await send(None)
@@ -117,6 +160,7 @@ async def handle(route, request):
 
     tabela = path.split('/rest/v1/')[1]
     if tabela == 'cond_ranking': return await send(filtrar(view_ranking(), qs))
+    if tabela == 'cond_ranking_ano': return await send(filtrar(view_ranking_ano(), qs))
     if tabela == 'cond_historico': return await send(filtrar(view_historico(), qs))
     rows = DB[tabela]
     if method == 'GET':

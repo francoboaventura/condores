@@ -5,7 +5,7 @@ import * as db from './lib/dados'
 
 const vazio = { nome: '', posicao: 'MEI', anivTxt: '', whatsapp: '', numero: '', tamanho: '' }
 
-export default function Atletas({ atletas, recarregar, diretor }) {
+export default function Atletas({ atletas, recarregar, diretor, temporada, verRanking }) {
   const toast = useToast()
   const [form, setForm] = useState(null)      // null | {id?, nome, posicao, anivTxt, whatsapp}
   const [menu, setMenu] = useState(null)      // atleta (folha ⋯)
@@ -101,6 +101,15 @@ export default function Atletas({ atletas, recarregar, diretor }) {
 
   return (
     <section className="tela on">
+      {temporada && temporada.campeao_nome && (
+        <div className="campeao-faixa home" onClick={verRanking}>
+          <span className="tr">🏆</span>
+          <div>
+            <b>Campeão {temporada.ano}: {temporada.campeao_nome}</b>
+            <span>{temporada.campeao_pontos} pts em {temporada.campeao_jogos} jogos · {temporada.total_rodadas} rodadas</span>
+          </div>
+        </div>
+      )}
       <div className="row sb" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Atletas</h2>
         <span className="tag">

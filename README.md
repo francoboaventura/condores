@@ -20,6 +20,12 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 Cada atleta tem número e tamanho de camisa; o número aparece no lugar das iniciais. Filtros por posição (GOL/ZAG/MEI/ATA) e por situação (disponíveis / DM / afastados), com botão ⇅ para alternar a ordem entre A–Z, número, posição e aniversário.
 
+## Temporadas (encerrar o ano)
+
+O ranking é por ano: a tela Ranking tem os botões dos anos disponíveis. No ano em aberto a tabela é calculada ao vivo; a diretoria encerra com "🏁 Encerrar o ano", o que congela o ranking daquele ano, registra o campeão e faz o ano seguinte começar do zero (as rodadas novas já são do ano novo). Anos encerrados aparecem com 🏆 no seletor e trazem a faixa do campeão; "Reabrir" desfaz o encerramento. Assim que existe um ano encerrado, a tela inicial (Atletas) mostra o destaque do campeão, que leva ao ranking daquele ano.
+
+Tabelas: `cond_temporadas` (ano, campeão, total de rodadas) e `cond_temporada_ranking` (o retrato final); view `cond_ranking_ano`; funções `cond_encerrar_ano` e `cond_reabrir_ano`.
+
 ## Quem saiu do time
 
 No menu ⋯ do atleta, "Saiu do time" o deixa oculto nas listas e fora do ranking, mantendo o histórico das rodadas. O filtro "🚪 Saíram" mostra essas pessoas e permite trazê-las de volta; no topo do ranking, um botão mostra ou oculta quem saiu. DM e afastamento continuam aparecendo normalmente.
