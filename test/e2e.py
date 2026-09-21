@@ -217,6 +217,29 @@ async def main():
             await pg.screenshot(path='test/t7-msg.png')
             await pg.click('text=Ranking'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'RANKING CONDORES' in t, t
+
+            # ---- "saiu do time": some das listas e do ranking ----
+            await aba(pg, 2); await pg.wait_for_selector('table')
+            antes = await pg.locator('#root tbody tr').count()
+            alvo = await pg.locator('#root tbody tr td').nth(1).inner_text()
+            await aba(pg, 0); await pg.wait_for_selector('.item')
+            await pg.locator(f'.item:has-text("{alvo}") .more:not([title])').click()
+            pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
+            await pg.click('text=Saiu do time'); await pg.wait_for_timeout(600)
+            assert await pg.locator(f'.card .item:has-text("{alvo}")').count() == 0, alvo
+            await aba(pg, 2); await pg.wait_for_selector('table')
+            assert await pg.locator('#root tbody tr').count() == antes - 1
+            await pg.click('text=Mostrar quem saiu'); await pg.wait_for_timeout(300)
+            assert await pg.locator('#root tbody tr').count() == antes
+            assert 'saiu' in await pg.locator(f'#root tbody tr:has-text("{alvo}")').inner_text()
+            await pg.screenshot(path='test/t16-saiu.png')
+            # volta ao time pelo filtro "Saíram"
+            await aba(pg, 0); await pg.click('.filtros button:has-text("Saíram")'); await pg.wait_for_timeout(500)
+            assert await pg.locator(f'.card .item:has-text("{alvo}")').count() == 1
+            await pg.locator(f'.item:has-text("{alvo}") .more:not([title])').click()
+            await pg.click('text=Voltou ao time'); await pg.wait_for_timeout(600)
+            await pg.click('.filtros button.limpa'); await pg.wait_for_timeout(400)
+            assert await pg.locator(f'.card .item:has-text("{alvo}")').count() == 1
             print('ERROS:', erros)
             assert not erros, erros
             await b.close()

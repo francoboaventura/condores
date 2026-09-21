@@ -15,7 +15,7 @@ export default function Mensagens({ atletas, tipoInicial, origem, onVoltar }) {
       try {
         if (tipo === 'ranking') {
           const [r, total] = await Promise.all([db.ranking(), db.totalRodadas()])
-          setTxt(msgRanking(r, total))
+          setTxt(msgRanking(r.filter((x) => x.ativo), total))
         } else {
           const rodada = await db.rodadaAtual()
           if (tipo === 'lista') setTxt(msgFaltam(rodada, atletas, await db.listarConfirmacoes(rodada.id)))

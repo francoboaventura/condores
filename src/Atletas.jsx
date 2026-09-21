@@ -13,7 +13,8 @@ export default function Atletas({ atletas, recarregar, diretor }) {
   const [usuarios, setUsuarios] = useState([])
   const [fPos, setFPos] = useState(null)      // GOL | ZAG | MEI | ATA
   const [fSit, setFSit] = useState(null)      // apto | dm | afastado
-  const [ordem, setOrdem] = useState('nome')  // nome | posicao | aniv
+  const [ordem, setOrdem] = useState('nome')  // nome | numero | posicao | aniv
+  const [saidos, setSaidos] = useState([])    // quem saiu do time (ativo = false)
 
   const noDM = atletas.filter((a) => a.dm).length
   const afastados = atletas.filter((a) => a.afastado).length
@@ -21,9 +22,10 @@ export default function Atletas({ atletas, recarregar, diretor }) {
 
   const ORD = { nome: 'A–Z', numero: 'Número', posicao: 'Posição', aniv: 'Aniversário' }
   const mesDia = (a) => (a.aniv_mes ? a.aniv_mes * 100 + a.aniv_dia : 9999)
-  const lista = atletas
+  const fonte = fSit === 'saiu' ? saidos : atletas
+  const lista = fonte
     .filter((a) => (!fPos || a.posicao === fPos)
-      && (!fSit || (fSit === 'dm' ? a.dm : fSit === 'afastado' ? a.afastado : !fora(a))))
+      && (!fSit || fSit === 'saiu' || (fSit === 'dm' ? a.dm : fSit === 'afastado' ? a.afastado : !fora(a))))
     .sort((x, y) => (
       ordem === 'numero' ? (x.numero ?? 999) - (y.numero ?? 999) || x.nome.localeCompare(y.nome)
         : ordem === 'posicao' ? POS.indexOf(x.posicao) - POS.indexOf(y.posicao) || x.nome.localeCompare(y.nome)
@@ -33,6 +35,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
   const filtrando = fPos || fSit
 
   useEffect(() => { if (diretor) db.listarUsuarios().then(setUsuarios).catch(() => {}) }, [diretor, atletas])
+  useEffect(() => { if (fSit === 'saiu') db.listarSaidos().then(setSaidos).catch((e) => toast(e.message)) }, [fSit, atletas])
 
   const run = async (fn, okMsg) => {
     try { await fn(); await recarregar(); if (okMsg) toast(okMsg) } catch (e) { toast(e.message) }
@@ -71,11 +74,16 @@ export default function Atletas({ atletas, recarregar, diretor }) {
     const a = menu; setMenu(null)
     await run(() => db.atualizarAtleta(a.id, { afastado: !a.afastado }), a.afastado ? `${a.nome} de volta ao time` : `${a.nome} afastado`)
   }
-  async function excluir() {
+  async function saiuDoTime() {
     const a = menu
-    if (!confirm(`Excluir ${a.nome}? O histórico de rodadas dele é mantido no ranking.`)) return
+    if (!confirm(`${a.nome} saiu do time? Ele fica oculto nas listas e sai do ranking; o histórico das rodadas é mantido.`)) return
     setMenu(null)
-    await run(() => db.excluirAtleta(a.id), 'Atleta excluído')
+    await run(() => db.marcarSaida(a.id), `${a.nome} saiu do time`)
+  }
+  async function voltouAoTime() {
+    const a = menu; setMenu(null)
+    try { await db.voltarAoTime(a.id); setSaidos(await db.listarSaidos()); await recarregar(); toast(`${a.nome} voltou ao time`) }
+    catch (e) { toast(e.message) }
   }
 
   // ---------- convite ----------
@@ -96,7 +104,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
       <div className="row sb" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>Atletas</h2>
         <span className="tag">
-          {filtrando ? `${lista.length} de ${atletas.length}` : `${atletas.length} atletas`}
+          {fSit === 'saiu' ? `${lista.length} saíram` : filtrando ? `${lista.length} de ${atletas.length}` : `${atletas.length} atletas`}
           {!filtrando && noDM ? ` · ${noDM} no DM` : ''}
           {!filtrando && afastados ? ` · ${afastados} afastado${afastados > 1 ? 's' : ''}` : ''}
         </span>
@@ -108,7 +116,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
           <button className="ord" onClick={() => setOrdem(ordem === 'nome' ? 'numero' : ordem === 'numero' ? 'posicao' : ordem === 'posicao' ? 'aniv' : 'nome')} title="Mudar a ordem">⇅ {ORD[ordem]}</button>
         </div>
         <div className="fl">
-          {[['apto', 'Disponíveis'], ['dm', '🏥 DM'], ['afastado', '⏸ Afastados']].map(([k, nome]) => (
+          {[['apto', 'Disponíveis'], ['dm', '🏥 DM'], ['afastado', '⏸ Afastados'], ['saiu', '🚪 Saíram']].map(([k, nome]) => (
             <button key={k} className={fSit === k ? 'on' : ''} onClick={() => setFSit(fSit === k ? null : k)}>{nome}</button>
           ))}
           {filtrando && <button className="limpa" onClick={() => { setFPos(null); setFSit(null) }}>limpar</button>}
@@ -117,10 +125,10 @@ export default function Atletas({ atletas, recarregar, diretor }) {
       <div className="card">
         <div className="lista">
           {lista.map((a) => (
-            <div key={a.id} className={`item ${fora(a) ? 'dm' : ''}`}>
+            <div key={a.id} className={`item ${fora(a) || a.ativo === false ? 'dm' : ''}`}>
               <div className={`av ${a.numero != null ? 'camisa' : ''}`}>{a.numero != null ? a.numero : ini(a.nome)}</div>
               <div className="nome" onClick={() => abrirEditar(a)} style={{ cursor: diretor ? 'pointer' : 'default' }}>
-                {a.nome} {a.dm && <span className="tag dm">DM</span>}{a.afastado && <span className="tag dm">afastado</span>}
+                {a.nome} {a.dm && <span className="tag dm">DM</span>}{a.afastado && <span className="tag dm">afastado</span>}{a.ativo === false && <span className="tag dm">saiu</span>}
                 <span className="sub">{a.tamanho ? `👕 ${a.tamanho} · ` : ''}🎂 {aniv(a) || '—'} · 📱 {a.whatsapp || '—'}{diretor && comConta(a) ? ` · ${comConta(a).papel === 'diretor' ? '⭐ diretoria' : '✅ tem acesso'}` : ''}</span>
               </div>
               {diretor
@@ -134,7 +142,7 @@ export default function Atletas({ atletas, recarregar, diretor }) {
         </div>
       </div>
       {diretor && <button className="fab" onClick={() => setForm({ ...vazio })}>+</button>}
-      {diretor && <p className="dica">✉ envia o convite de acesso ao app · ⋯ abre DM, afastamento e excluir · segure a posição para trocar.</p>}
+      {diretor && <p className="dica">✉ envia o convite de acesso ao app · ⋯ abre DM, afastamento e saída do time · segure a posição para trocar.</p>}
 
       <Modal aberto={!!form}>
         {form && (
@@ -175,10 +183,19 @@ export default function Atletas({ atletas, recarregar, diretor }) {
         {menu && (
           <div className="sheet">
             <h2>{menu.nome}</h2>
-            <button onClick={toggleDM}>{menu.dm ? '✅ Voltar do DM' : '🏥 Enviar para o DM'}</button>
-            <button onClick={toggleAfastado}>{menu.afastado ? '✅ Voltar ao time' : '⏸ Afastamento justificado'}</button>
-            <button onClick={() => setMenu(null)}>Fechar</button>
-            <button className="perigo" onClick={excluir}>🗑 Excluir atleta</button>
+            {menu.ativo === false ? (
+              <>
+                <button onClick={voltouAoTime}>↩️ Voltou ao time</button>
+                <button onClick={() => setMenu(null)}>Fechar</button>
+              </>
+            ) : (
+              <>
+                <button onClick={toggleDM}>{menu.dm ? '✅ Voltar do DM' : '🏥 Enviar para o DM'}</button>
+                <button onClick={toggleAfastado}>{menu.afastado ? '✅ Voltar ao time' : '⏸ Afastamento justificado'}</button>
+                <button onClick={() => setMenu(null)}>Fechar</button>
+                <button className="perigo" onClick={saiuDoTime}>🚪 Saiu do time</button>
+              </>
+            )}
           </div>
         )}
       </Modal>

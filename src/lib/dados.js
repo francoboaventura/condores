@@ -29,7 +29,10 @@ export const listarUsuarios = () => ok(supabase.from('cond_usuarios').select('*'
 export const listarAtletas = () => ok(supabase.from('cond_atletas').select('*').eq('ativo', true).order('nome'))
 export const salvarAtleta = (a) => um(supabase.from('cond_atletas').upsert(a).select())
 export const atualizarAtleta = (id, campos) => ok(supabase.from('cond_atletas').update(campos).eq('id', id))
-export const excluirAtleta = (id) => atualizarAtleta(id, { ativo: false, dm: false })
+// "Saiu do time": fica oculto nas listas e fora do ranking, mas o histórico é mantido
+export const marcarSaida = (id) => atualizarAtleta(id, { ativo: false, dm: false, afastado: false })
+export const voltarAoTime = (id) => atualizarAtleta(id, { ativo: true })
+export const listarSaidos = () => ok(supabase.from('cond_atletas').select('*').eq('ativo', false).order('nome'))
 
 // ---------- rodada ----------
 export async function rodadaAtual() {

@@ -20,6 +20,10 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 Cada atleta tem número e tamanho de camisa; o número aparece no lugar das iniciais. Filtros por posição (GOL/ZAG/MEI/ATA) e por situação (disponíveis / DM / afastados), com botão ⇅ para alternar a ordem entre A–Z, número, posição e aniversário.
 
+## Quem saiu do time
+
+No menu ⋯ do atleta, "Saiu do time" o deixa oculto nas listas e fora do ranking, mantendo o histórico das rodadas. O filtro "🚪 Saíram" mostra essas pessoas e permite trazê-las de volta; no topo do ranking, um botão mostra ou oculta quem saiu. DM e afastamento continuam aparecendo normalmente.
+
 ## Confirmações
 
 As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao toque e listam os nomes, com a posição de cada um; em "Não vão" aparecem também os que estão no DM ou afastados, com a etiqueta.

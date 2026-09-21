@@ -11,6 +11,7 @@ export default function Ranking({ atletas, meuNome, irParaMsg }) {
   const [encerradas, setEncerradas] = useState([])
   const [hist, setHist] = useState(null) // {atleta, linhas}
   const [aberta, setAberta] = useState(null)
+  const [verSaidos, setVerSaidos] = useState(false)  // mostrar no ranking quem saiu do time
 
   useEffect(() => {
     (async () => {
@@ -29,9 +30,12 @@ export default function Ranking({ atletas, meuNome, irParaMsg }) {
     } catch (err) { toast(err.message) }
   }
 
+  const rankVisivel = rank.filter((x) => x.ativo || verSaidos)
+  const qtdSaidos = rank.filter((x) => !x.ativo).length
+
   const nomesTime = (r, t) => {
     const lista = r.cond_escalacoes.filter((e) => e.time === t).sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0))
-    return lista.map((e) => (e.goleiro ? '🧤 ' : '') + (e.convidado_nome ? `${e.convidado_nome} (conv.)` : e.cond_atletas?.nome || '(excluído)')).join(', ') || '—'
+    return lista.map((e) => (e.goleiro ? '🧤 ' : '') + (e.convidado_nome ? `${e.convidado_nome} (conv.)` : e.cond_atletas?.nome || '(saiu)')).join(', ') || '—'
   }
   const timesDa = (r) => (tresTimes(r) ? ['P', 'B', 'V'] : ['P', 'B'])
 
@@ -48,21 +52,30 @@ export default function Ranking({ atletas, meuNome, irParaMsg }) {
 
       {aba === 'rank' && (
         <div>
+          {qtdSaidos > 0 && (
+            <div className="filtros" style={{ marginBottom: 8 }}>
+              <div className="fl">
+                <button className={verSaidos ? 'on' : ''} onClick={() => setVerSaidos(!verSaidos)}>
+                  {verSaidos ? '🚪 Ocultar quem saiu' : `🚪 Mostrar quem saiu (${qtdSaidos})`}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="card" style={{ padding: '6px 10px' }}>
             <table>
               <thead><tr><th>#</th><th>Atleta</th><th>Pts</th><th>J</th><th>Freq</th><th>Méd</th></tr></thead>
               <tbody>
-                {rank.map((x, i) => (
+                {rankVisivel.map((x, i) => (
                   <tr key={x.atleta_id} className={`${i < 3 ? 'top' : ''} ${meuNome && x.nome === meuNome ? 'eu' : ''}`} onClick={() => abrirHist(x)} style={{ cursor: 'pointer' }}>
                     <td className="pos">{i + 1}</td>
-                    <td>{x.nome}{x.dm && <> <span className="tag dm">DM</span></>}{!x.ativo && <> <span className="tag">excluído</span></>}</td>
+                    <td>{x.nome}{x.dm && <> <span className="tag dm">DM</span></>}{!x.ativo && <> <span className="tag dm">saiu</span></>}</td>
                     <td className="pts">{x.pontos}</td>
                     <td>{x.jogos}</td>
                     <td>{Math.round(x.frequencia * 100)}%</td>
                     <td>{Number(x.media).toFixed(2).replace('.', ',')}</td>
                   </tr>
                 ))}
-                {!rank.length && <tr><td colSpan={6} className="dica" style={{ textAlign: 'left' }}>Nenhuma rodada encerrada ainda.</td></tr>}
+                {!rankVisivel.length && <tr><td colSpan={6} className="dica" style={{ textAlign: 'left' }}>Nenhuma rodada encerrada ainda.</td></tr>}
               </tbody>
             </table>
           </div>
