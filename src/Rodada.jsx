@@ -18,6 +18,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   const [podio, setPodio] = useState({ v: null, s: null }) // campeão / vice (3 times)
   const [encerradas, setEncerradas] = useState([])
   const [editando, setEditando] = useState(null)
+  const [aberta, setAberta] = useState(null)   // rodada registrada aberta (mostra a escalação do dia)
   const [carregando, setCarregando] = useState(true)
   const [aLancar, setALancar] = useState([])
   const [escolher, setEscolher] = useState(false)
@@ -223,6 +224,14 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
       document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up)
     }
   })
+
+  // escalação de uma rodada já registrada
+  const nomesDaRodada = (r, t) => {
+    const lista = r.cond_escalacoes.filter((e) => e.time === t).sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0))
+    return lista
+      .map((e) => (e.goleiro ? '🧤 ' : '') + (e.convidado_nome ? `${e.convidado_nome} (conv.)` : e.cond_atletas?.nome || '(saiu)'))
+      .join(', ') || '—'
+  }
 
   // ---------- resultado ----------
   async function salvarResultado() {
@@ -467,7 +476,9 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
           <div className="card"><div className="lista">
             {encerradas.map((r) => (
               <div key={r.id}>
-                <div className="item" onClick={() => diretor && temPlacar(r) && setEditando(editando?.id === r.id ? null : { id: r.id, gp: r.gols_preto ?? '', gb: r.gols_bege ?? '' })} style={{ cursor: diretor && temPlacar(r) ? 'pointer' : 'default' }}>
+                <div className={`item ${aberta === r.id ? 'aberto' : ''}`}
+                     onClick={() => { setAberta(aberta === r.id ? null : r.id); setEditando(null) }}
+                     style={{ cursor: 'pointer' }}>
                   <div className="nome">Seg {ddmm(r.data)}<span className="sub">
                     {r.cond_escalacoes.filter((e) => e.atleta_id).length} atletas
                     {r.cond_escalacoes.some((e) => e.convidado_nome) ? ` + ${r.cond_escalacoes.filter((e) => e.convidado_nome).length} conv.` : ''}
@@ -477,16 +488,28 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
                     ? <><span className="tag preto">Preto {r.gols_preto}</span><span className="tag bege">Bege {r.gols_bege}</span></>
                     : <span className="tag">{r.vencedor === 'E' ? 'empate' : `${TIMES[r.vencedor]?.emoji || ''} venceu`}</span>}
                 </div>
-                {editando?.id === r.id && (
-                  <div style={{ padding: '4px 0 12px' }}>
-                    <div className="placar" style={{ margin: '4px 0 10px' }}>
-                      <input type="number" min="0" value={editando.gp} onChange={(e) => setEditando({ ...editando, gp: e.target.value })} />
-                      <span>×</span>
-                      <input type="number" min="0" value={editando.gb} onChange={(e) => setEditando({ ...editando, gb: e.target.value })} />
-                    </div>
-                    <button className="btn sm" onClick={salvarCorrecao}>Corrigir placar</button>
-                  </div>
-                )}
+                <div className="hist-det">
+                  {chavesTimes(r.times_qtd).map((t) => (
+                    <div key={t}><b>{TIMES[t].emoji} {TIMES[t].nome}:</b> {nomesDaRodada(r, t)}</div>
+                  ))}
+                  {diretor && temPlacar(r) && (
+                    editando?.id === r.id ? (
+                      <div style={{ paddingTop: 8 }}>
+                        <div className="placar" style={{ margin: '4px 0 10px' }}>
+                          <input type="number" min="0" value={editando.gp} onChange={(e) => setEditando({ ...editando, gp: e.target.value })} />
+                          <span>×</span>
+                          <input type="number" min="0" value={editando.gb} onChange={(e) => setEditando({ ...editando, gb: e.target.value })} />
+                        </div>
+                        <button className="btn sm" onClick={salvarCorrecao}>Salvar placar</button>
+                      </div>
+                    ) : (
+                      <button className="btn sm sec" style={{ marginTop: 8 }}
+                              onClick={(ev) => { ev.stopPropagation(); setEditando({ id: r.id, gp: r.gols_preto ?? '', gb: r.gols_bege ?? '' }) }}>
+                        Corrigir placar
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             ))}
             {!encerradas.length && <p className="dica">Nenhuma rodada encerrada ainda.</p>}

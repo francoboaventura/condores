@@ -218,6 +218,18 @@ async def main():
             await pg.click('text=Ranking'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'RANKING CONDORES' in t, t
 
+            # ---- rodadas registradas expandem a escalação do dia ----
+            await aba(pg, 1); await pg.locator('#root .seg button').nth(2).click(); await pg.wait_for_timeout(400)
+            reg = pg.locator('#root h3:has-text("Rodadas registradas") + .card .item')
+            assert await reg.count() >= 1
+            await reg.first.click(); await pg.wait_for_timeout(300)
+            det = await pg.locator('#root .item.aberto + .hist-det').inner_text()
+            assert 'Preto' in det and 'Bege' in det, det
+            assert '🧤' in det, det
+            await pg.screenshot(path='test/t19-rodada-expandida.png')
+            await reg.first.click(); await pg.wait_for_timeout(300)
+            assert await pg.locator('#root .item.aberto').count() == 0
+
             # ---- encerrar o ano e destacar o campeão ----
             await aba(pg, 2); await pg.wait_for_selector('table')
             campeao = await pg.locator('#root tbody tr td').nth(1).inner_text()

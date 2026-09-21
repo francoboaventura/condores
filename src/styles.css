@@ -199,3 +199,4 @@ header .usr a{display:block;font-size:11px;text-decoration:underline;margin-top:
 .campeao-faixa.home{display:flex;align-items:center;gap:10px;cursor:pointer}
 .campeao-faixa.home .tr{font-size:26px;line-height:1}
 .campeao-faixa.home div{flex:1}
+.hist-det button{pointer-events:auto}

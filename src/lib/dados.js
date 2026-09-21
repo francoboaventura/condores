@@ -85,7 +85,7 @@ export const listarRodadasEncerradas = () =>
 export const anoAtual = () => new Date().getFullYear()
 export const ranking = (ano = anoAtual()) =>
   ok(supabase.from('cond_ranking_ano').select('*').eq('ano', ano).gt('jogos', 0)
-    .order('pontos', { ascending: false }).order('jogos', { ascending: false }))
+    .order('pontos', { ascending: false }).order('jogos', { ascending: false }).order('nome'))
 export const totalRodadas = async (ano = anoAtual()) =>
   (await ok(supabase.from('cond_rodadas').select('data').eq('status', 'encerrada')
     .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`))).length
