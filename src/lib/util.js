@@ -5,9 +5,10 @@ export const fora = (a) => !!(a.dm || a.afastado)
 
 // Times: P = Preto, B = Bege, V = Vermelho (o terceiro, usado só de vez em quando)
 export const TIMES = {
-  P: { nome: 'Preto', emoji: '⚫', classe: 'preto', gk: 'verde' },
-  B: { nome: 'Bege', emoji: '🟡', classe: 'bege', gk: 'laranja' },
-  V: { nome: 'Vermelho', emoji: '🔴', classe: 'vermelho', gk: 'azul' },
+  // emojiMsg / emojiGk: como cada jogador aparece na mensagem do WhatsApp (cor do colete)
+  P: { nome: 'Preto', emoji: '⚫', classe: 'preto', gk: 'verde', emojiMsg: '⚫', emojiGk: '🟢' },
+  B: { nome: 'Bege', emoji: '🟡', classe: 'bege', gk: 'laranja', emojiMsg: '⚪', emojiGk: '🟠' },
+  V: { nome: 'Vermelho', emoji: '🔴', classe: 'vermelho', gk: 'azul', emojiMsg: '🔴', emojiGk: '🔵' },
 }
 export const chavesTimes = (qtd) => (qtd === 3 ? ['P', 'B', 'V'] : ['P', 'B'])
 

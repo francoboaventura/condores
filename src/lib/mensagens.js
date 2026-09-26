@@ -20,15 +20,14 @@ export function msgEscalacao(rodada, atletas, escalacao) {
     return i < 0 ? POS.length : i
   }
   const bloco = (t) => {
-    const gk = escalacao.filter((e) => e.time === t && e.goleiro).map((e) => `🧤 ${nome(e)}`)
+    const gk = escalacao.filter((e) => e.time === t && e.goleiro).map((e) => `${TIMES[t].emojiGk} ${nome(e)}`)
     const lin = escalacao.filter((e) => e.time === t && !e.goleiro)
       .sort((a, b) => ordem(a) - ordem(b))
-      .map((e, i) => `${i + 1}. ${nome(e)}`)
+      .map((e) => `${TIMES[t].emojiMsg} ${nome(e)}`)
     return [...gk, ...lin].join('\n') || '—'
   }
-  const times = chavesTimes(rodada.times_qtd)
-    .map((t) => `${TIMES[t].emoji} *${TIMES[t].nome.toUpperCase()}*\n${bloco(t)}`)
-    .join('\n\n')
+  // sem título de time: o emoji ao lado de cada nome já diz de que lado ele joga
+  const times = chavesTimes(rodada.times_qtd).map((t) => bloco(t)).join('\n\n')
   return `🦅 *ESCALAÇÃO — Segunda ${ddmm(rodada.data)}*\n🕗 20h · Radar${tresTimes(rodada) ? '\n(rodada com 3 times)' : ''}\n\n${times}\n\nBom jogo, Condores! 🏆`
 }
 

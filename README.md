@@ -43,6 +43,7 @@ As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao to
 - Convidado entra só na rodada, com posição escolhida na hora (conta no sorteio, não pontua); o × ao lado do nome apaga.
 - Os confirmados sem time aparecem agrupados: goleiros em cima e ZAG / MEI / ATA em três colunas.
 - Dentro de cada time os nomes seguem a ordem do campo: goleiro, depois ZAG, MEI e ATA — na tela, na escalação de rodadas antigas e na mensagem do WhatsApp.
+- Na mensagem do WhatsApp cada jogador vem com o emoji da cor do time no lugar do número: ⚫ Preto e ⚪ Bege, com os goleiros na cor do colete (🟢 e 🟠). No terceiro time é 🔴 com goleiro 🔵. Os times não levam título: o emoji ao lado do nome já diz de que lado cada um joga; os blocos ficam separados por uma linha em branco.
 - Ao gerar uma mensagem, o caminho de volta ("‹ Rodada › Escalação › WhatsApp") fica no topo da tela de Mensagens.
 
 ## Histórico

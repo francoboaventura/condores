@@ -218,7 +218,12 @@ async def main():
             await aba(pg, 3); await pg.wait_for_selector('pre.msg'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'Ainda não confirmaram' in t, t
             await pg.click('text=Escalação (seg)'); await pg.wait_for_timeout(400)
-            t = await pg.locator('pre.msg').inner_text(); assert 'Beto (convidado, ATA)' in t and '🧤' in t, t
+            t = await pg.locator('pre.msg').inner_text()
+            assert 'Beto (convidado, ATA)' in t, t
+            assert '🟢 ' in t and '🟠 ' in t, t          # goleiros com a cor do colete
+            assert '⚫ ' in t and '⚪ ' in t, t          # jogadores com a cor do time
+            assert 'PRETO' not in t and 'BEGE' not in t, t   # sem título de time
+            assert '1. ' not in t.split('Radar')[1], t       # sem numeração
             await pg.screenshot(path='test/t7-msg.png')
             await pg.click('text=Ranking'); await pg.wait_for_timeout(400)
             t = await pg.locator('pre.msg').inner_text(); assert 'RANKING CONDORES' in t, t
