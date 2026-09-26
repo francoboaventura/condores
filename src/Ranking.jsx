@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Modal, useToast } from './ui'
-import { ddmm, RES_NOME, RES_CLASSE, nomeVencedor, temPlacar, tresTimes, TIMES } from './lib/util'
+import { ddmm, RES_NOME, RES_CLASSE, nomeVencedor, temPlacar, tresTimes, TIMES, POS } from './lib/util'
 import * as db from './lib/dados'
 
 export default function Ranking({ atletas, meuNome, diretor, irParaMsg, aoMudarTemporadas }) {
@@ -61,7 +61,12 @@ export default function Ranking({ atletas, meuNome, diretor, irParaMsg, aoMudarT
   }
 
   const nomesTime = (r, t) => {
-    const lista = r.cond_escalacoes.filter((e) => e.time === t).sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0))
+    const ordem = (e) => {
+      const i = POS.indexOf(e.convidado_nome ? e.convidado_pos : e.cond_atletas?.posicao)
+      return i < 0 ? POS.length : i
+    }
+    const lista = r.cond_escalacoes.filter((e) => e.time === t)
+      .sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0) || ordem(a) - ordem(b))
     return lista.map((e) => (e.goleiro ? '🧤 ' : '') + (e.convidado_nome ? `${e.convidado_nome} (conv.)` : e.cond_atletas?.nome || '(saiu)')).join(', ') || '—'
   }
   const timesDa = (r) => (tresTimes(r) ? ['P', 'B', 'V'] : ['P', 'B'])

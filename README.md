@@ -42,6 +42,7 @@ As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao to
 - Botão **2 / 3 times**: o terceiro time é o Vermelho (goleiro de colete azul). Com 3 times o resultado é campeão (3 pts) e 2º lugar (1 pt); com 2 times segue placar ou vencedor (3/1/0).
 - Convidado entra só na rodada, com posição escolhida na hora (conta no sorteio, não pontua); o × ao lado do nome apaga.
 - Os confirmados sem time aparecem agrupados: goleiros em cima e ZAG / MEI / ATA em três colunas.
+- Dentro de cada time os nomes seguem a ordem do campo: goleiro, depois ZAG, MEI e ATA — na tela, na escalação de rodadas antigas e na mensagem do WhatsApp.
 - Ao gerar uma mensagem, o caminho de volta ("‹ Rodada › Escalação › WhatsApp") fica no topo da tela de Mensagens.
 
 ## Histórico

@@ -1,4 +1,4 @@
-import { ddmm, TIMES, chavesTimes, tresTimes } from './util'
+import { ddmm, TIMES, chavesTimes, tresTimes, POS } from './util'
 
 // Lista de sexta: só quem ainda não respondeu (DM e afastados não entram)
 export function msgFaltam(rodada, atletas, confirmacoes) {
@@ -15,9 +15,15 @@ export function msgEscalacao(rodada, atletas, escalacao) {
     const a = atletas.find((x) => x.id === e.atleta_id)
     return a ? `${a.nome} (${a.posicao})` : '?'
   }
+  const ordem = (e) => {
+    const i = POS.indexOf(e.convidado_nome ? e.convidado_pos : atletas.find((x) => x.id === e.atleta_id)?.posicao)
+    return i < 0 ? POS.length : i
+  }
   const bloco = (t) => {
     const gk = escalacao.filter((e) => e.time === t && e.goleiro).map((e) => `🧤 ${nome(e)}`)
-    const lin = escalacao.filter((e) => e.time === t && !e.goleiro).map((e, i) => `${i + 1}. ${nome(e)}`)
+    const lin = escalacao.filter((e) => e.time === t && !e.goleiro)
+      .sort((a, b) => ordem(a) - ordem(b))
+      .map((e, i) => `${i + 1}. ${nome(e)}`)
     return [...gk, ...lin].join('\n') || '—'
   }
   const times = chavesTimes(rodada.times_qtd)

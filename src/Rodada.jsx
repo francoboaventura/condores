@@ -99,6 +99,10 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   // ---------- escalação ----------
   const nomeDe = (e) => e.convidado_nome || atletas.find((a) => a.id === e.atleta_id)?.nome || '?'
   const posDe = (e) => (e.convidado_nome ? e.convidado_pos || 'conv.' : atletas.find((a) => a.id === e.atleta_id)?.posicao || '')
+  // dentro do time: ZAG, depois MEI, depois ATA
+  const ordemPos = (e) => POS.indexOf(posDe(e)) < 0 ? POS.length : POS.indexOf(posDe(e))
+  const porPosicao = (a, b) => ordemPos(a) - ordemPos(b) || nomeDe(a).localeCompare(nomeDe(b))
+
   const baseBanco = passada ? ativos.map((a) => a.id) : sim
   const semTime = baseBanco.filter((id) => !esc.some((e) => e.atleta_id === id)).map((id) => atletas.find((a) => a.id === id)).filter(Boolean)
   // banco agrupado por posição: goleiros em cima, depois ZAG / MEI / ATA em colunas
@@ -227,7 +231,13 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
 
   // escalação de uma rodada já registrada
   const nomesDaRodada = (r, t) => {
-    const lista = r.cond_escalacoes.filter((e) => e.time === t).sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0))
+    const ordem = (e) => {
+      const p = e.convidado_nome ? e.convidado_pos : e.cond_atletas?.posicao
+      const i = POS.indexOf(p)
+      return i < 0 ? POS.length : i
+    }
+    const lista = r.cond_escalacoes.filter((e) => e.time === t)
+      .sort((a, b) => (b.goleiro ? 1 : 0) - (a.goleiro ? 1 : 0) || ordem(a) - ordem(b))
     return lista
       .map((e) => (e.goleiro ? '🧤 ' : '') + (e.convidado_nome ? `${e.convidado_nome} (conv.)` : e.cond_atletas?.nome || '(saiu)'))
       .join(', ') || '—'
@@ -269,7 +279,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   const Time = ({ t }) => {
     const { nome, emoji, classe, gk } = TIMES[t]
     const gks = esc.filter((e) => e.time === t && e.goleiro)
-    const lin = esc.filter((e) => e.time === t && !e.goleiro)
+    const lin = esc.filter((e) => e.time === t && !e.goleiro).sort(porPosicao)
     return (
       <div className={`time ${classe}`}>
         <h4>{emoji} {nome} <span>{gks.length + lin.length}</span></h4>

@@ -121,6 +121,11 @@ async def main():
             pP, pB = await posicoes('.time.preto .linha .j'), await posicoes('.time.bege .linha .j')
             for pos in ('ZAG', 'MEI', 'ATA'):
                 assert abs(pP.count(pos) - pB.count(pos)) <= 1, (pos, pP, pB)
+            # dentro do time: ZAG, depois MEI, depois ATA
+            ordem = {'ZAG': 0, 'MEI': 1, 'ATA': 2}
+            for lst in (pP, pB):
+                nums = [ordem.get(p, 9) for p in lst]
+                assert nums == sorted(nums), lst
             await pg.fill('input[placeholder="Nome do convidado"]', 'Beto')
             await pg.select_option('.conv-add select', 'ATA'); await pg.click('.conv-add button')
             assert await pg.locator('.banco-col[data-pos="ATA"] .chip:has-text("Beto")').count() == 1
