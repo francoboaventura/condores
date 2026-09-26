@@ -25,7 +25,11 @@ export default function Login({ token }) {
     setOcupado(true)
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha })
     setOcupado(false)
-    if (error) toast(error.message.includes('Invalid') ? 'E-mail ou senha incorretos' : error.message)
+    if (error) {
+      const m = error.message || ''
+      toast(/not confirmed/i.test(m) ? 'Falta confirmar o e-mail — veja a mensagem que enviamos (e o spam)'
+        : m.includes('Invalid') ? 'E-mail ou senha incorretos' : m)
+    }
   }
 
   async function cadastrar(e) {
@@ -39,12 +43,15 @@ export default function Login({ token }) {
       if (/already|registered|exists/i.test(error.message)) {
         // já tem conta: basta entrar que o convite é aplicado
         const r = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha })
-        if (r.error) toast('Esse e-mail já tem conta. Entre com a senha dele para aceitar o convite.')
+        if (r.error) { setModo('entrar'); toast('Esse e-mail já tem conta. Entre com a senha dela.') }
         return
       }
       return toast(error.message)
     }
-    if (!data.session) setAviso('Conta criada! Enviamos um e-mail de confirmação. Confirme e depois entre aqui com seu e-mail e senha — o convite é aplicado automaticamente.')
+    if (!data.session) {
+      setAviso('Conta criada! Antes de entrar, confirme o e-mail que acabamos de enviar para ' + email.trim()
+        + ' — olhe também na caixa de spam. Depois volte aqui e entre com seu e-mail e senha: o convite é aplicado sozinho. Se o e-mail não chegar, avise a diretoria.')
+    }
   }
 
   return (
@@ -79,6 +86,7 @@ export default function Login({ token }) {
             <label className="lb">Crie uma senha</label>
             <input className="txt" type="password" autoComplete="new-password" minLength={6} value={senha} onChange={(e) => setSenha(e.target.value)} required />
             <button className="btn" disabled={ocupado || !convite}>{ocupado ? 'Criando…' : 'Criar conta'}</button>
+            <p className="dica" style={{ marginTop: 10, lineHeight: 1.4 }}>Use um e-mail que você consiga abrir agora — pode ser preciso confirmar por lá antes do primeiro acesso.</p>
             <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>
               <a href="#" style={{ color: 'var(--bege)' }} onClick={(e) => { e.preventDefault(); setModo('entrar') }}>Já tenho conta</a>
             </p>

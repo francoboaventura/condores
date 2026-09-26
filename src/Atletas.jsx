@@ -161,7 +161,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
             <input className="txt" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Ex.: João" />
             <label className="lb">Posição</label>
             <PosBtn big pos={form.posicao} onChange={(p) => setForm({ ...form, posicao: p })} />
-            <p className="dica" style={{ margin: '-2px 0 10px' }}>Segure o botão para escolher: GOL · ZAG · MEI · ATA.</p>
+            <p className="dica" style={{ margin: '0 0 12px' }}>Segure o botão para escolher: GOL · ZAG · MEI · ATA.</p>
             <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <label className="lb">Camisa nº</label>

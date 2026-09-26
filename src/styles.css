@@ -99,7 +99,7 @@ label.lb{display:block;color:var(--mudo);font-size:12px;margin-bottom:4px;text-t
 .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--bege);color:#111;padding:9px 16px;border-radius:999px;font-weight:700;font-size:13px;display:none;z-index:10}
 .posbtn{font-size:11px;font-weight:800;letter-spacing:.06em;padding:4px 9px;border-radius:6px;border:1px solid var(--bege2);color:var(--bege);background:#000;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;white-space:nowrap}
 .posbtn.GOL{background:var(--verde);border-color:var(--verde);color:#fff}
-.posbtn.big{font-size:14px;padding:12px;width:100%;text-align:center;border-radius:10px}
+.posbtn.big{display:block;width:100%;box-sizing:border-box;font-size:15px;padding:12px;margin-bottom:6px;text-align:center;border-radius:10px}
 .pop{position:fixed;z-index:30;background:var(--preto2);border:1px solid var(--bege2);border-radius:12px;padding:6px;display:none;gap:6px;box-shadow:0 10px 30px rgba(0,0,0,.7)}
 .pop.on{display:flex}
 .pop button{border:1px solid var(--linha);background:var(--preto3);color:var(--txt);font-weight:800;font-size:13px;padding:10px 12px;border-radius:8px;cursor:pointer;letter-spacing:.05em}
