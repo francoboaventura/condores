@@ -284,6 +284,45 @@ async def main():
             await pg.click('text=Voltou ao time'); await pg.wait_for_timeout(600)
             await pg.click('.filtros button.limpa'); await pg.wait_for_timeout(400)
             assert await pg.locator(f'.card .item:has-text("{alvo}")').count() == 1
+
+            # ---- votação Atleta Mais Condores (pública, sem login) ----
+            from mock_supabase import DB
+            await aba(pg, 4); await pg.wait_for_selector('text=Ainda não votaram')
+            assert 'Nenhum voto' in await pg.locator('main').inner_text()
+            assert '#/votacao' in await pg.locator('pre.msg').inner_text()
+            pctx = await b.new_context(viewport={'width': 390, 'height': 844}); pub = await pctx.new_page()
+            pub.on('pageerror', lambda e: erros.append(str(e)))
+            await pctx.route('https://ynwumghaptydfoaskbui.supabase.co/**', handle)
+            await pub.goto(URL + '#/votacao'); await pub.wait_for_selector('text=Quem é você?')
+            assert await pub.locator('#login').count() == 0 and await pub.locator('nav').count() == 0
+            await pub.screenshot(path='test/t20-votacao-quem.png')
+            await pub.click('.voto-op:has-text("Wilson")'); await pub.wait_for_selector('text=Em quem você vota?')
+            assert await pub.locator('.voto-op:has-text("Wilson")').count() == 0   # não vota em si mesmo
+            assert await pub.locator('.voto-barra .btn').is_disabled()
+            await pub.click('.voto-op:has-text("Rodrigo")')
+            await pub.screenshot(path='test/t21-votacao-voto.png')
+            await pub.click('text=Confirmar voto em Rodrigo'); await pub.wait_for_selector('text=Obrigado, Wilson!')
+            await pub.screenshot(path='test/t22-votacao-obrigado.png')
+            await pub.click('text=Voltar ao início'); await pub.wait_for_selector('text=Quem é você?')
+            w = pub.locator('.voto-op:has-text("Wilson")')
+            assert await w.is_disabled() and 'já votou' in await w.inner_text()
+            # dois ao mesmo tempo com o mesmo nome: o banco recusa o segundo
+            await pub.click('.voto-op:has-text("Ivan")'); await pub.click('.voto-op:has-text("Rodrigo")')
+            ivan, rod = (next(a['id'] for a in DB['cond_atletas'] if a['nome'] == n) for n in ('Ivan', 'Rodrigo'))
+            DB['cond_votos_atleta_mais_condores'].append(dict(id='x', eleitor_id=ivan, votado_id=rod))  # outro aparelho votou antes
+            await pub.click('text=Confirmar voto em Rodrigo'); await pub.wait_for_selector('.aviso')
+            assert 'Esse atleta já votou' in await pub.locator('.aviso').inner_text()
+            assert await pub.locator('.voto-op:has-text("Ivan")').is_disabled()
+            await pctx.close()
+            # resultado na diretoria
+            await aba(pg, 0); await aba(pg, 4); await pg.wait_for_selector('table')
+            assert await pg.locator('.stat .card b').first.inner_text() == '2'
+            assert 'Rodrigo' in await pg.locator('#root tbody tr').first.inner_text()
+            assert await pg.locator('#root tbody tr td.pts').first.inner_text() == '2'
+            faltam = len([a for a in DB['cond_atletas'] if a['ativo']]) - 2
+            assert await pg.locator('.stat .card b').nth(1).inner_text() == str(faltam)
+            await pg.screenshot(path='test/t23-votacao-resultado.png')
+
             print('ERROS:', erros)
             assert not erros, erros
             await b.close()

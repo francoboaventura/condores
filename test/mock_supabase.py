@@ -19,6 +19,7 @@ DB = {
                           whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True, numero=CAMISA.get(n,(None,None))[0], tamanho=CAMISA.get(n,(None,None))[1]) for n,d,m in nomes],
     'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, vice=None, times_qtd=2, origem='planilha')], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
     'cond_temporadas': [], 'cond_temporada_ranking': [],
+    'cond_votos_atleta_mais_condores': [],
 }
 
 def venc(r):
@@ -157,6 +158,27 @@ async def handle(route, request):
         DB['cond_usuarios'] = [u for u in DB['cond_usuarios'] if u['email'] != SESSAO['email']] + [dict(email=SESSAO['email'], nome=a['nome'], papel=c['papel'], atleta_id=a['id'])]
         c['usado_em'] = 'agora'
         return await send(dict(nome=a['nome'], papel=c['papel']))
+
+    # ---- votação Atleta Mais Condores ----
+    VOTOS = DB['cond_votos_atleta_mais_condores']
+    if path.startswith('/rest/v1/rpc/cond_votacao_atletas'):
+        votaram = {v['eleitor_id'] for v in VOTOS}
+        return await send([dict(id=a['id'], nome=a['nome'], numero=a['numero'], ja_votou=a['id'] in votaram)
+                           for a in sorted(DB['cond_atletas'], key=lambda a: a['nome']) if a['ativo']])
+    if path.startswith('/rest/v1/rpc/cond_votacao_resultado'):
+        ativos = [a for a in DB['cond_atletas'] if a['ativo']]
+        votaram = {v['eleitor_id'] for v in VOTOS}
+        cont = {}
+        for v in VOTOS: cont[v['votado_id']] = cont.get(v['votado_id'], 0) + 1
+        nome = {a['id']: a for a in DB['cond_atletas']}
+        rk = sorted([dict(atleta_id=k, nome=nome[k]['nome'], numero=nome[k]['numero'], votos=n) for k, n in cont.items()], key=lambda x: (-x['votos'], x['nome']))
+        return await send(dict(total_votos=len(VOTOS), total_atletas=len(ativos), faltam_votar=len([a for a in ativos if a['id'] not in votaram]), ranking=rk))
+    if path.startswith('/rest/v1/cond_votos_atleta_mais_condores') and method == 'POST':
+        if any(v['eleitor_id'] == body['eleitor_id'] for v in VOTOS):
+            return await send(dict(code='23505', message='duplicate key value violates unique constraint "cond_votos_amc_um_voto_por_atleta"'), 409)
+        if body['eleitor_id'] == body['votado_id']:
+            return await send(dict(code='42501', message='new row violates row-level security policy'), 403)
+        VOTOS.append(dict(id=str(uuid.uuid4()), **body)); return await send(None, 201)
 
     tabela = path.split('/rest/v1/')[1]
     if tabela == 'cond_ranking': return await send(filtrar(view_ranking(), qs))
