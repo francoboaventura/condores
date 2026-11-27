@@ -106,3 +106,17 @@ export const historicoAtleta = (atleta_id, ano = anoAtual()) =>
 export const listarDatasEncerradas = (ano = anoAtual()) =>
   ok(supabase.from('cond_rodadas').select('id, data').eq('status', 'encerrada')
     .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`).order('data', { ascending: false }))
+
+// ---------- votação "Atleta Mais Condores" ----------
+// pública (sem login): lista de atletas com a marca de quem já votou, e o voto
+export const votacaoAtletas = () => ok(supabase.rpc('cond_votacao_atletas'))
+export async function votar(eleitor_id, votado_id) {
+  const { error } = await supabase.from('cond_votos_atleta_mais_condores').insert({ eleitor_id, votado_id })
+  if (!error) return
+  // 23505 = já existe voto desse atleta (unicidade no banco)
+  if (error.code === '23505') { const e = new Error('Esse atleta já votou'); e.jaVotou = true; throw e }
+  throw new Error(error.message)
+}
+// só diretoria
+export const votacaoResultado = () => ok(supabase.rpc('cond_votacao_resultado'))
+export const linkVotacao = () => location.origin + import.meta.env.BASE_URL + '#/votacao'

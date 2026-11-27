@@ -6,6 +6,8 @@ import Atletas from './Atletas'
 import Rodada from './Rodada'
 import Ranking from './Ranking'
 import Mensagens from './Mensagens'
+import Votacao from './Votacao'
+import VotacaoResultado from './VotacaoResultado'
 import * as db from './lib/dados'
 
 const ESCUDO = import.meta.env.BASE_URL + 'escudo.png'
@@ -69,6 +71,7 @@ function Shell() {
   const voltar = () => { if (!origem) return; setTela(origem.tela); setOrigem(null) }
   const trocarTela = (k) => { setTela(k); if (k !== 'msg') setOrigem(null) }
   const abas = [['atletas', 'Atletas'], ['rodada', 'Rodada'], ['ranking', 'Ranking'], ['msg', 'WhatsApp']]
+  if (perfil.diretor) abas.push(['votacao', 'Votação'])
 
   return (
     <div className="app">
@@ -82,6 +85,7 @@ function Shell() {
         {tela === 'rodada' && <Rodada atletas={atletas} diretor={perfil.diretor} meuAtletaId={perfil.atleta_id} passoInicial={rodadaPasso} onPasso={setRodadaPasso} irParaMsg={irParaMsg} irParaRanking={() => setTela('ranking')} />}
         {tela === 'ranking' && <Ranking atletas={atletas} meuNome={perfil.nome} diretor={perfil.diretor} irParaMsg={irParaMsg} aoMudarTemporadas={recarregarTemporadas} />}
         {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} origem={origem} onVoltar={voltar} />}
+        {tela === 'votacao' && perfil.diretor && <VotacaoResultado />}
       </main>
       <nav>
         {abas.map(([k, nome]) => (
@@ -92,6 +96,15 @@ function Shell() {
   )
 }
 
+// votação pública (sem login): .../condores/#/votacao
+const ehVotacao = () => /^#\/votacao\b/i.test(location.hash) || /\/votacao\/?$/i.test(location.pathname)
+
 export default function App() {
-  return <ToastProvider><Shell /></ToastProvider>
+  const [votacao, setVotacao] = useState(ehVotacao())
+  useEffect(() => {
+    const f = () => setVotacao(ehVotacao())
+    window.addEventListener('hashchange', f)
+    return () => window.removeEventListener('hashchange', f)
+  }, [])
+  return <ToastProvider>{votacao ? <Votacao /> : <Shell />}</ToastProvider>
 }

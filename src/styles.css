@@ -200,3 +200,17 @@ header .usr a{display:block;font-size:11px;text-decoration:underline;margin-top:
 .campeao-faixa.home .tr{font-size:26px;line-height:1}
 .campeao-faixa.home div{flex:1}
 .hist-det button{pointer-events:auto}
+
+/* votação pública "Atleta Mais Condores" */
+.votacao main{padding-bottom:24px}
+.votacao header h1{font-size:16px}
+button.item.voto-op{width:100%;background:none;border:0;border-bottom:1px solid var(--linha);color:var(--txt);font:inherit;text-align:left;cursor:pointer;min-height:56px}
+button.item.voto-op:last-child{border-bottom:0}
+button.item.voto-op:disabled{cursor:default;opacity:.45}
+button.item.voto-op.on{background:#191509;margin:0 -14px;padding-left:14px;padding-right:14px;width:calc(100% + 28px)}
+button.item.voto-op.on .av.camisa{background:var(--bege);color:#111;border-color:var(--bege)}
+button.item.voto-op .marca{color:var(--bege);font-weight:800;font-size:18px;width:20px;text-align:center}
+.voto-barra{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--preto) 30%)}
+.voto-fim{text-align:center;padding:48px 8px}
+.voto-fim .tr{font-size:64px;line-height:1;margin-bottom:16px}
+.voto-fim p{color:var(--mudo);margin-bottom:24px}
