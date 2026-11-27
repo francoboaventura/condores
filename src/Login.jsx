@@ -8,7 +8,9 @@ const ESCUDO = import.meta.env.BASE_URL + 'escudo.png'
 // Tela de entrada. Com um convite na URL (#/convite/TOKEN) abre o cadastro; sem, abre o login.
 export default function Login({ token }) {
   const toast = useToast()
-  const [modo, setModo] = useState(token ? 'cadastro' : 'entrar')
+  const [modo, setModo] = useState(token ? 'cadastro' : 'atleta')   // atleta (nome + senha) | entrar (e-mail) | cadastro
+  const [lista, setLista] = useState(null)     // atletas para o login por nome
+  const [escolhido, setEscolhido] = useState('')
   const [convite, setConvite] = useState(null) // {nome, papel, usado}
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -19,6 +21,21 @@ export default function Login({ token }) {
     if (!token) return
     db.verConvite(token).then((c) => { if (!c) { toast('Convite inválido'); setModo('entrar') } else setConvite(c) }).catch((e) => toast(e.message))
   }, [token])
+
+  useEffect(() => {
+    if (modo !== 'atleta' || lista) return
+    db.loginAtletas().then(setLista).catch((e) => { setLista([]); toast(e.message) })
+  }, [modo])
+
+  async function entrarAtleta(e) {
+    e.preventDefault()
+    const a = lista?.find((x) => x.id === escolhido)
+    if (!a) return toast('Escolha o seu nome')
+    setOcupado(true)
+    const { error } = await supabase.auth.signInWithPassword({ email: a.email, password: senha })
+    setOcupado(false)
+    if (error) toast(error.message?.includes('Invalid') ? 'Senha incorreta' : error.message)
+  }
 
   async function entrar(e) {
     e.preventDefault()
@@ -63,6 +80,21 @@ export default function Login({ token }) {
             <p style={{ lineHeight: 1.5, marginBottom: 14 }}>{aviso}</p>
             <button className="btn" onClick={() => { setAviso(''); setModo('entrar') }}>Ir para o login</button>
           </>
+        ) : modo === 'atleta' ? (
+          <form onSubmit={entrarAtleta}>
+            <label className="lb">Quem é você?</label>
+            <select className="txt" value={escolhido} onChange={(e) => setEscolhido(e.target.value)} required>
+              <option value="">{lista ? 'Escolha o seu nome' : 'Carregando…'}</option>
+              {(lista || []).map((a) => <option key={a.id} value={a.id}>{a.nome}{a.numero != null ? ` · ${a.numero}` : ''}</option>)}
+            </select>
+            <label className="lb">Senha</label>
+            <input className="txt" type="password" autoComplete="current-password" autoCapitalize="none" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+            <button className="btn" disabled={ocupado}>{ocupado ? 'Entrando…' : 'Entrar'}</button>
+            <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>Primeiro acesso? Use a senha que a diretoria passou.</p>
+            <p className="dica" style={{ textAlign: 'center', marginTop: 10 }}>
+              <a href="#" className="entrar-email" style={{ color: 'var(--bege)' }} onClick={(e) => { e.preventDefault(); setSenha(''); setModo('entrar') }}>Entrar com e-mail (diretoria)</a>
+            </p>
+          </form>
         ) : modo === 'entrar' ? (
           <form onSubmit={entrar}>
             <label className="lb">E-mail</label>
@@ -70,7 +102,9 @@ export default function Login({ token }) {
             <label className="lb">Senha</label>
             <input className="txt" type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
             <button className="btn" disabled={ocupado}>{ocupado ? 'Entrando…' : 'Entrar'}</button>
-            <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>Ainda não tem conta? Peça o link de convite para a diretoria.</p>
+            <p className="dica" style={{ textAlign: 'center', marginTop: 14 }}>
+              <a href="#" style={{ color: 'var(--bege)' }} onClick={(e) => { e.preventDefault(); setSenha(''); setModo('atleta') }}>‹ Entrar com meu nome</a>
+            </p>
           </form>
         ) : (
           <form onSubmit={cadastrar}>

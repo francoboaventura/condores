@@ -8,6 +8,8 @@ import Ranking from './Ranking'
 import Mensagens from './Mensagens'
 import Votacao from './Votacao'
 import VotacaoResultado from './VotacaoResultado'
+import PrimeiroAcesso from './PrimeiroAcesso'
+import VotoPopup from './VotoPopup'
 import * as db from './lib/dados'
 
 const ESCUDO = import.meta.env.BASE_URL + 'escudo.png'
@@ -27,6 +29,8 @@ function Shell() {
   const [origem, setOrigem] = useState(null)      // de onde a pessoa veio para a tela de Mensagens
   const [rodadaPasso, setRodadaPasso] = useState(1)
   const [atletas, setAtletas] = useState([])
+  const [atletasOk, setAtletasOk] = useState(false)  // lista já carregada (para decidir o primeiro acesso)
+  const [voto, setVoto] = useState(false)            // pop-up da votação aberto
   const [temporada, setTemporada] = useState(null)   // última temporada encerrada (destaque do campeão)
 
   useEffect(() => {
@@ -50,15 +54,22 @@ function Shell() {
   }, [])
 
   const recarregarAtletas = useCallback(async () => {
-    try { setAtletas(await db.listarAtletas()) } catch (e) { toast(e.message) }
+    try { setAtletas(await db.listarAtletas()); setAtletasOk(true) } catch (e) { toast(e.message) }
   }, [])
 
   const recarregarTemporadas = useCallback(async () => {
     try { const ts = await db.listarTemporadas(); setTemporada(ts[0] || null) } catch { /* sem temporada encerrada */ }
   }, [])
 
-  useEffect(() => { if (sessao) carregarPerfil(); else setPerfil(null) }, [sessao])
+  useEffect(() => { if (sessao) carregarPerfil(); else { setPerfil(null); setAtletasOk(false); setVoto(false) } }, [sessao])
   useEffect(() => { if (perfil?.liberado) { recarregarAtletas(); recarregarTemporadas() } }, [perfil])
+  // votação: abre o pop-up para quem tem ficha de atleta, já passou pelo primeiro acesso e ainda não votou
+  useEffect(() => {
+    if (!perfil?.atleta_id || !atletasOk) return
+    const eu = atletas.find((a) => a.id === perfil.atleta_id)
+    if (perfil.papel === 'atleta' && (perfil.trocar_senha || !eu?.cadastro_ok_em)) return
+    db.jaVotei(perfil.atleta_id).then((j) => setVoto(!j)).catch(() => {})
+  }, [perfil, atletasOk])
   // ao trocar de tela, volta para o topo (senão a pessoa cai no meio da página)
   useEffect(() => { window.scrollTo(0, 0) }, [tela])
 
@@ -66,12 +77,22 @@ function Shell() {
   if (!sessao) return <div className="app"><Login token={tokenDaUrl()} /></div>
   if (!perfil) return <div className="app" />
   if (!perfil.liberado) return <div className="app"><SemAcesso email={perfil.email} onSair={() => supabase.auth.signOut()} /></div>
+  if (!atletasOk) return <div className="app" />
+
+  // primeiro acesso do atleta: senha própria + dados; depois, o pop-up da votação
+  const meuAtleta = atletas.find((a) => a.id === perfil.atleta_id)
+  if (perfil.papel === 'atleta' && meuAtleta && (perfil.trocar_senha || !meuAtleta.cadastro_ok_em)) {
+    const pronto = async () => { await recarregarAtletas(); setPerfil(await db.meuPerfil()) }
+    return <div className="app"><PrimeiroAcesso atleta={meuAtleta} trocarSenha={perfil.trocar_senha} onPronto={pronto} onSair={() => supabase.auth.signOut()} /></div>
+  }
 
   const irParaMsg = (t, de) => { setMsgTipo(t); if (de) { setOrigem(de); if (de.passo) setRodadaPasso(de.passo) } else setOrigem(null); setTela('msg') }
   const voltar = () => { if (!origem) return; setTela(origem.tela); setOrigem(null) }
   const trocarTela = (k) => { setTela(k); if (k !== 'msg') setOrigem(null) }
-  const abas = [['atletas', 'Atletas'], ['rodada', 'Rodada'], ['ranking', 'Ranking'], ['msg', 'WhatsApp']]
-  if (perfil.diretor) abas.push(['votacao', 'Votação'])
+  // por enquanto o ranking fica só para a diretoria
+  const abas = perfil.diretor
+    ? [['atletas', 'Atletas'], ['rodada', 'Rodada'], ['ranking', 'Ranking'], ['msg', 'WhatsApp'], ['votacao', 'Votação']]
+    : [['atletas', 'Atletas'], ['rodada', 'Rodada'], ['msg', 'WhatsApp']]
 
   return (
     <div className="app">
@@ -81,12 +102,13 @@ function Shell() {
         <div className="usr">{perfil.diretor ? 'diretoria' : 'atleta'}<b>{perfil.nome}</b><a href="#" onClick={(e) => { e.preventDefault(); supabase.auth.signOut() }} style={{ color: 'var(--mudo)' }}>sair</a></div>
       </header>
       <main>
-        {tela === 'atletas' && <Atletas atletas={atletas} recarregar={recarregarAtletas} diretor={perfil.diretor} temporada={temporada} verRanking={() => setTela('ranking')} />}
+        {tela === 'atletas' && <Atletas atletas={atletas} recarregar={recarregarAtletas} diretor={perfil.diretor} temporada={temporada} verRanking={perfil.diretor ? () => setTela('ranking') : null} />}
         {tela === 'rodada' && <Rodada atletas={atletas} diretor={perfil.diretor} meuAtletaId={perfil.atleta_id} passoInicial={rodadaPasso} onPasso={setRodadaPasso} irParaMsg={irParaMsg} irParaRanking={() => setTela('ranking')} />}
-        {tela === 'ranking' && <Ranking atletas={atletas} meuNome={perfil.nome} diretor={perfil.diretor} irParaMsg={irParaMsg} aoMudarTemporadas={recarregarTemporadas} />}
-        {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} origem={origem} onVoltar={voltar} />}
+        {tela === 'ranking' && perfil.diretor && <Ranking atletas={atletas} meuNome={perfil.nome} diretor={perfil.diretor} irParaMsg={irParaMsg} aoMudarTemporadas={recarregarTemporadas} />}
+        {tela === 'msg' && <Mensagens atletas={atletas} tipoInicial={msgTipo} origem={origem} onVoltar={voltar} diretor={perfil.diretor} />}
         {tela === 'votacao' && perfil.diretor && <VotacaoResultado />}
       </main>
+      {voto && <VotoPopup atletas={atletas} meuAtletaId={perfil.atleta_id} onFechar={() => setVoto(false)} />}
       <nav>
         {abas.map(([k, nome]) => (
           <button key={k} className={tela === k ? 'on' : ''} onClick={() => trocarTela(k)}>{Icone[k]}{nome}</button>

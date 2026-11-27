@@ -14,7 +14,7 @@ export async function meuPerfil() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const u = await um(supabase.from('cond_usuarios').select('*').eq('email', user.email.toLowerCase()).limit(1))
-  return { email: user.email, nome: u?.nome || null, papel: u?.papel || null, atleta_id: u?.atleta_id || null, liberado: !!u, diretor: u?.papel === 'diretor' }
+  return { email: user.email, nome: u?.nome || null, papel: u?.papel || null, atleta_id: u?.atleta_id || null, liberado: !!u, diretor: u?.papel === 'diretor', trocar_senha: !!u?.trocar_senha }
 }
 export const verConvite = (token) => ok(supabase.rpc('cond_ver_convite', { p_token: token }))
 export const usarConvite = (token) => ok(supabase.rpc('cond_usar_convite', { p_token: token }))
@@ -107,9 +107,36 @@ export const listarDatasEncerradas = (ano = anoAtual()) =>
   ok(supabase.from('cond_rodadas').select('id, data').eq('status', 'encerrada')
     .gte('data', `${ano}-01-01`).lte('data', `${ano}-12-31`).order('data', { ascending: false }))
 
-// ---------- votação "Atleta Mais Condores" ----------
-// pública (sem login): lista de atletas com a marca de quem já votou, e o voto
-export const votacaoAtletas = () => ok(supabase.rpc('cond_votacao_atletas'))
+// ---------- acesso dos atletas (nome + senha) ----------
+export const loginAtletas = () => ok(supabase.rpc('cond_login_atletas'))
+// primeiro acesso: troca a senha padrão pela do atleta (o banco confere que mudou)
+export async function trocarSenha(nova) {
+  const { error } = await supabase.auth.updateUser({ password: nova })
+  if (error) throw new Error(/different|same/i.test(error.message) ? 'A senha nova precisa ser diferente da senha padrão.' : error.message)
+  await ok(supabase.rpc('cond_senha_trocada'))
+}
+export const completarCadastro = (whatsapp, aniv_dia, aniv_mes, foto_url) =>
+  ok(supabase.rpc('cond_completar_cadastro', { p_whatsapp: whatsapp, p_aniv_dia: aniv_dia, p_aniv_mes: aniv_mes, p_foto_url: foto_url }))
+// reduz a foto no celular (até 800px) e sobe para o Storage; devolve o endereço público
+export async function enviarFoto(atleta_id, arquivo) {
+  const img = await createImageBitmap(arquivo)
+  const k = Math.min(1, 800 / Math.max(img.width, img.height))
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85))
+  const caminho = `${atleta_id}/foto-${Date.now()}.jpg`
+  await ok(supabase.storage.from('cond-fotos').upload(caminho, blob, { contentType: 'image/jpeg', upsert: true }))
+  return supabase.storage.from('cond-fotos').getPublicUrl(caminho).data.publicUrl
+}
+// diretoria
+export const resetarSenhaAtleta = (atleta_id) => ok(supabase.rpc('cond_resetar_senha_atleta', { p_atleta: atleta_id }))
+export const senhaPadrao = () => ok(supabase.rpc('cond_senha_padrao'))
+
+// ---------- votação "Atleta Mais Condores" (com login: cada um vota como ele mesmo) ----------
+export async function jaVotei(atleta_id) {
+  const l = await ok(supabase.from('cond_votos_atleta_mais_condores').select('eleitor_id').eq('eleitor_id', atleta_id).limit(1))
+  return l.length > 0
+}
 export async function votar(eleitor_id, votado_id) {
   const { error } = await supabase.from('cond_votos_atleta_mais_condores').insert({ eleitor_id, votado_id })
   if (!error) return
@@ -119,4 +146,3 @@ export async function votar(eleitor_id, votado_id) {
 }
 // só diretoria
 export const votacaoResultado = () => ok(supabase.rpc('cond_votacao_resultado'))
-export const linkVotacao = () => location.origin + import.meta.env.BASE_URL + '#/votacao'

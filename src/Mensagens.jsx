@@ -3,7 +3,7 @@ import { useToast } from './ui'
 import { msgFaltam, msgEscalacao, msgRanking } from './lib/mensagens'
 import * as db from './lib/dados'
 
-export default function Mensagens({ atletas, tipoInicial, origem, onVoltar }) {
+export default function Mensagens({ atletas, tipoInicial, origem, onVoltar, diretor }) {
   const toast = useToast()
   const [tipo, setTipo] = useState(tipoInicial || 'lista')
   const [txt, setTxt] = useState('')
@@ -43,7 +43,7 @@ export default function Mensagens({ atletas, tipoInicial, origem, onVoltar }) {
       <div className="seg">
         <button className={tipo === 'lista' ? 'on' : ''} onClick={() => setTipo('lista')}>Faltam confirmar</button>
         <button className={tipo === 'escalacao' ? 'on' : ''} onClick={() => setTipo('escalacao')}>Escalação (seg)</button>
-        <button className={tipo === 'ranking' ? 'on' : ''} onClick={() => setTipo('ranking')}>Ranking</button>
+        {diretor && <button className={tipo === 'ranking' ? 'on' : ''} onClick={() => setTipo('ranking')}>Ranking</button>}
       </div>
       <pre className="msg">{txt || 'Carregando…'}</pre>
       <button className="btn" onClick={copiar}>Copiar mensagem</button>

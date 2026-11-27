@@ -46,12 +46,22 @@ As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao to
 - Na mensagem do WhatsApp cada jogador vem com o emoji da cor do time no lugar do número: ⚫ Preto e ⚪ Bege, com os goleiros na cor do colete (🟢 e 🟠). No terceiro time é 🔴 com goleiro 🔵. Os times não levam título: o emoji ao lado do nome já diz de que lado cada um joga; os blocos ficam separados por uma linha em branco.
 - Ao gerar uma mensagem, o caminho de volta ("‹ Rodada › Escalação › WhatsApp") fica no topo da tela de Mensagens.
 
+## Acesso dos atletas
+
+- Na tela de entrada o atleta escolhe o próprio nome e digita a senha. No primeiro acesso usa a **senha padrão** (a diretoria vê qual é na aba Votação), cria a própria senha e confirma WhatsApp e aniversário; a foto é opcional.
+- Por trás, cada atleta ativo tem uma conta com e-mail interno (`atleta-<id>@atletas.condores.app`); atleta novo ou que volta ao time ganha a conta sozinho. A senha padrão fica em `cond_config` (`senha_padrao_atletas`), fora do código.
+- Esqueceu a senha: no menu ⋯ do atleta, "🔑 Voltar senha para a padrão".
+- A diretoria continua entrando com e-mail ("Entrar com e-mail (diretoria)"); convites por link seguem funcionando.
+- Por enquanto o **ranking fica só para a diretoria** (aba e mensagem de ranking escondidas para atletas).
+- SQL em `dados/acesso-atletas.sql`; fotos no Storage, bucket `cond-fotos`.
+
 ## Votação "Atleta Mais Condores"
 
-- Link público, sem login: https://francoboaventura.github.io/condores/#/votacao — o atleta toca no próprio nome, escolhe em quem vota (não aparece o próprio nome) e confirma. Quem já votou aparece apagado com "já votou".
-- Cada atleta vota uma vez e não pode votar em si mesmo: o banco garante as duas regras. Se duas pessoas usarem o mesmo nome ao mesmo tempo, o segundo voto é recusado e a tela avisa "Esse atleta já votou".
-- O público só consegue registrar o voto e ver quem já votou; em quem cada um votou e a contagem só aparecem para a diretoria, na aba **Votação** (ranking, total de votos, quantos faltam e botão para copiar o link para o WhatsApp).
-- Banco: tabela `cond_votos_atleta_mais_condores`; funções `cond_votacao_atletas` (lista pública) e `cond_votacao_resultado` (diretoria). SQL em `dados/votacao-atleta-mais-condores.sql`.
+- Depois do primeiro acesso, o app abre um pop-up para o atleta votar (o próprio nome não aparece). "Votar depois" fecha e o pop-up volta no próximo acesso até ele votar.
+- Cada atleta vota uma vez, só como ele mesmo e nunca em si: o banco garante. Voto repetido (dois aparelhos ao mesmo tempo) é recusado com "Esse atleta já votou".
+- Em quem cada um votou e a contagem só aparecem para a diretoria, na aba **Votação** (ranking, total de votos, quantos faltam e mensagem pronta para o WhatsApp).
+- O link público antigo (`#/votacao`) agora só avisa que a votação é pelo app.
+- Banco: tabela `cond_votos_atleta_mais_condores`, função `cond_votacao_resultado`. SQL em `dados/votacao-atleta-mais-condores.sql` e `dados/acesso-atletas.sql`.
 
 ## Histórico
 
@@ -70,7 +80,7 @@ Teste automático (usa um Supabase de mentira, sem internet): `npm run build && 
 
 - `src/App.jsx` — login, cabeçalho, navegação
 - `src/Atletas.jsx`, `src/Rodada.jsx`, `src/Ranking.jsx`, `src/Mensagens.jsx` — as quatro telas
-- `src/Votacao.jsx` (votação pública) e `src/VotacaoResultado.jsx` (resultado, só diretoria)
+- `src/PrimeiroAcesso.jsx` (primeiro acesso do atleta), `src/VotoPopup.jsx` (pop-up da votação), `src/VotacaoResultado.jsx` (resultado, só diretoria), `src/Votacao.jsx` (aviso no link antigo)
 - `src/lib/dados.js` — todas as leituras e gravações no Supabase
 - `src/lib/mensagens.js` — os textos de WhatsApp
 - `prototipo/condores-prototipo.html` — protótipo aprovado que definiu o visual

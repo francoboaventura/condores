@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useToast } from './ui'
 import * as db from './lib/dados'
+import { URL_APP } from './lib/util'
 
 // Resultado da votação "Atleta Mais Condores" (só diretoria)
 export default function VotacaoResultado() {
   const toast = useToast()
   const [r, setR] = useState(null)
-  const link = db.linkVotacao()
-  const texto = `🏆 *Atleta Mais Condores*\nVote no atleta que mais representou o Condores! Cada um vota uma vez:\n${link}`
+  const [senha, setSenha] = useState('')
+  const texto = `🦅 *CONDORES — o app está liberado!*\n\nEntre em ${URL_APP}\n\n1. Escolha o seu nome\n2. Senha: *${senha || '…'}*\n3. Crie a sua senha e confira seus dados\n4. Vote no 🏆 *Atleta Mais Condores* (cada um vota uma vez)`
 
   async function carregar() {
     try { setR(await db.votacaoResultado()) } catch (e) { toast(e.message) }
   }
+  useEffect(() => { db.senhaPadrao().then((s) => setSenha(s || '')).catch(() => {}) }, [])
   useEffect(() => { carregar() }, [])
 
   async function copiar() {
-    try { await navigator.clipboard.writeText(texto); toast('Link copiado!') }
-    catch { toast('Não deu pra copiar automaticamente — copie o link abaixo.') }
+    try { await navigator.clipboard.writeText(texto); toast('Mensagem copiada!') }
+    catch { toast('Não deu pra copiar automaticamente — copie o texto acima.') }
   }
 
   const max = r?.ranking?.[0]?.votos || 0
@@ -52,11 +54,11 @@ export default function VotacaoResultado() {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Link da votação</h3>
+        <h3 style={{ marginTop: 0 }}>Convite para os atletas</h3>
         <pre className="msg">{texto}</pre>
-        <button className="btn" onClick={copiar}>Copiar link para o WhatsApp</button>
+        <button className="btn" onClick={copiar}>Copiar mensagem para o WhatsApp</button>
         <a className="btn sec" style={{ marginTop: 8, textDecoration: 'none' }} href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer">Abrir no WhatsApp</a>
-        <p className="dica">Quem abre o link não precisa de login.</p>
+        <p className="dica">A votação aparece para cada atleta logo depois do primeiro acesso. Se alguém esquecer a senha, use 🔑 no menu ⋯ do atleta (tela Atletas).</p>
       </div>
     </section>
   )

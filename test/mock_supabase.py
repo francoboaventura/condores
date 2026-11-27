@@ -21,6 +21,15 @@ DB = {
     'cond_temporadas': [], 'cond_temporada_ranking': [],
     'cond_votos_atleta_mais_condores': [],
 }
+# acesso dos atletas por nome + senha padrão (contas "por trás")
+SENHA_PADRAO = 'senha-teste-123'
+EMAIL_ATLETA = lambda i: f'atleta-{i}@atletas.condores.app'
+for _a in DB['cond_atletas']:
+    USERS[EMAIL_ATLETA(_a['id'])] = SENHA_PADRAO
+    DB['cond_usuarios'].append(dict(email=EMAIL_ATLETA(_a['id']), nome=_a['nome'], papel='atleta', atleta_id=_a['id'], trocar_senha=True))
+FOTOS = []
+def eu_usuario(): return next((u for u in DB['cond_usuarios'] if u['email'] == SESSAO['email']), None)
+def meu_atleta(): u = eu_usuario(); return u and u.get('atleta_id')
 
 def venc(r):
     if r.get('times_qtd', 2) == 2 and r.get('gols_preto') is not None and r.get('gols_bege') is not None:
@@ -107,7 +116,10 @@ def embed(rows, select):
 
 async def handle(route, request):
     u = urlparse(request.url); qs = parse_qs(unquote(u.query)); path = u.path; method = request.method
-    body = json.loads(request.post_data) if request.post_data else None
+    if '/storage/v1/object/' in u.path and request.method in ('POST', 'PUT'):
+        body = None   # upload de foto (binário)
+    else:
+        body = json.loads(request.post_data) if request.post_data else None
     hdr = {'content-type': 'application/json', 'access-control-allow-origin': '*'}
     async def send(data, status=200): await route.fulfill(status=status, headers=hdr, body=json.dumps(data))
 
@@ -118,6 +130,11 @@ async def handle(route, request):
             SESSAO['email'] = body['email']
             return await send(dict(access_token='tok', token_type='bearer', expires_in=3600, expires_at=9999999999, refresh_token='ref', user=dict(id='u1', email=body['email'], aud='authenticated', role='authenticated')))
         return await send(dict(error='invalid_grant', error_description='Invalid login credentials', msg='Invalid login credentials'), 400)
+    if path.startswith('/auth/v1/user') and method == 'PUT':
+        if body.get('password') == USERS.get(SESSAO['email']):
+            return await send(dict(code='same_password', msg='New password should be different from the old password.'), 422)
+        USERS[SESSAO['email']] = body['password']
+        return await send(dict(id='u1', email=SESSAO['email'], aud='authenticated', role='authenticated'))
     if path.startswith('/auth/v1/user'):
         return await send(dict(id='u1', email=SESSAO['email'], aud='authenticated', role='authenticated'))
     if path.startswith('/auth/v1/signup'):
@@ -161,10 +178,30 @@ async def handle(route, request):
 
     # ---- votação Atleta Mais Condores ----
     VOTOS = DB['cond_votos_atleta_mais_condores']
-    if path.startswith('/rest/v1/rpc/cond_votacao_atletas'):
-        votaram = {v['eleitor_id'] for v in VOTOS}
-        return await send([dict(id=a['id'], nome=a['nome'], numero=a['numero'], ja_votou=a['id'] in votaram)
+    if path.startswith('/rest/v1/rpc/cond_login_atletas'):
+        return await send([dict(id=a['id'], nome=a['nome'], numero=a['numero'], email=EMAIL_ATLETA(a['id']))
                            for a in sorted(DB['cond_atletas'], key=lambda a: a['nome']) if a['ativo']])
+    if path.startswith('/rest/v1/rpc/cond_senha_trocada'):
+        if USERS.get(SESSAO['email']) == SENHA_PADRAO: return await send(dict(message='A senha nova precisa ser diferente da senha padrão.'), 400)
+        eu_usuario()['trocar_senha'] = False; return await send(None)
+    if path.startswith('/rest/v1/rpc/cond_completar_cadastro'):
+        if eu_usuario().get('trocar_senha'): return await send(dict(message='Crie sua senha nova primeiro.'), 400)
+        a = next(a for a in DB['cond_atletas'] if a['id'] == meu_atleta())
+        a.update(whatsapp=body['p_whatsapp'], aniv_dia=body['p_aniv_dia'], aniv_mes=body['p_aniv_mes'], cadastro_ok_em='agora')
+        if body.get('p_foto_url'): a['foto_url'] = body['p_foto_url']
+        return await send(None)
+    if path.startswith('/rest/v1/rpc/cond_resetar_senha_atleta'):
+        USERS[EMAIL_ATLETA(body['p_atleta'])] = SENHA_PADRAO
+        next(u for u in DB['cond_usuarios'] if u['email'] == EMAIL_ATLETA(body['p_atleta']))['trocar_senha'] = True
+        return await send(None)
+    if path.startswith('/rest/v1/rpc/cond_senha_padrao'):
+        return await send(SENHA_PADRAO)
+    if path.startswith('/storage/v1/object/public/'):
+        import base64
+        png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
+        return await route.fulfill(status=200, headers={'content-type': 'image/png', 'access-control-allow-origin': '*'}, body=png)
+    if path.startswith('/storage/v1/object/cond-fotos/'):
+        FOTOS.append(path); return await send(dict(Key=path.split('/storage/v1/object/')[1]))
     if path.startswith('/rest/v1/rpc/cond_votacao_resultado'):
         ativos = [a for a in DB['cond_atletas'] if a['ativo']]
         votaram = {v['eleitor_id'] for v in VOTOS}
@@ -176,7 +213,7 @@ async def handle(route, request):
     if path.startswith('/rest/v1/cond_votos_atleta_mais_condores') and method == 'POST':
         if any(v['eleitor_id'] == body['eleitor_id'] for v in VOTOS):
             return await send(dict(code='23505', message='duplicate key value violates unique constraint "cond_votos_amc_um_voto_por_atleta"'), 409)
-        if body['eleitor_id'] == body['votado_id']:
+        if body['eleitor_id'] != meu_atleta() or body['eleitor_id'] == body['votado_id']:
             return await send(dict(code='42501', message='new row violates row-level security policy'), 403)
         VOTOS.append(dict(id=str(uuid.uuid4()), **body)); return await send(None, 201)
 

@@ -214,3 +214,15 @@ button.item.voto-op .marca{color:var(--bege);font-weight:800;font-size:18px;widt
 .voto-fim{text-align:center;padding:48px 8px}
 .voto-fim .tr{font-size:64px;line-height:1;margin-bottom:16px}
 .voto-fim p{color:var(--mudo);margin-bottom:24px}
+
+/* primeiro acesso e pop-up da votação */
+#login.primeiro{padding-top:32px}
+#login.primeiro img{width:84px;height:84px;margin-bottom:16px}
+.foto-up{display:flex;align-items:center;gap:12px;background:var(--preto3);border:1px dashed var(--bege2);border-radius:10px;padding:10px 12px;margin-bottom:12px;cursor:pointer;color:var(--bege);font-weight:600;font-size:14px}
+.foto-up img{width:56px;height:56px;border-radius:50%;object-fit:cover;margin:0}
+.foto-up .av{width:56px;height:56px;font-size:18px}
+.av.foto{object-fit:cover;border:1px solid var(--bege2);padding:0}
+.voto-pop{display:flex;flex-direction:column;max-height:86vh}
+.voto-lista{overflow-y:auto;flex:1;margin:0 -16px;padding:0 16px;border-top:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.voto-pop button.item.voto-op.on{margin:0 -16px;padding-left:16px;padding-right:16px;width:calc(100% + 32px)}
+.voto-pop .voto-fim{padding:24px 8px 8px}
