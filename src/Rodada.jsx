@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useToast } from './ui'
 import { ini, ddmm, nomeVencedor, temPlacar, tresTimes, proximaSegunda, fora, TIMES, chavesTimes, sortearTimes, POS } from './lib/util'
 import * as db from './lib/dados'
+import Churrasco from './Churrasco'
 
 export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1, onPasso, irParaMsg, irParaRanking }) {
   const toast = useToast()
@@ -30,6 +31,8 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   const fechada = rodada?.status === 'encerrada'
   const passada = rodada && rodada.data < proximaSegunda()
   const podeEditar = diretor && !fechada
+  const confAbertas = !!rodada?.confirmacoes_abertas && !fechada
+  const escVisivel = diretor || fechada || !!rodada?.escalacao_liberada
   const times = chavesTimes(rodada?.times_qtd)
   const tres = rodada && tresTimes(rodada)
 
@@ -86,6 +89,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
   function alternar(a) {
     if (fechada) return toast('Rodada encerrada')
     if (!diretor && a.id !== meuAtletaId) return
+    if (!diretor && !confAbertas) return toast('Confirmações fechadas')
     if (a.dm) return toast('Atleta no DM')
     if (a.afastado) return toast('Atleta afastado')
     const s = statusDe(a.id)
@@ -320,7 +324,7 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
       {diretor && aLancar.length > 0 && !passada && (
         <p className="dica" style={{ margin: '-4px 0 12px' }}>⚠️ {aLancar.length} rodada{aLancar.length > 1 ? 's' : ''} antiga{aLancar.length > 1 ? 's' : ''} sem resultado — toque na data acima para lançar.</p>
       )}
-      {!diretor && <p className="dica" style={{ margin: '-4px 0 12px' }}>Toque no seu nome para confirmar presença. Escalação e resultado são lançados pela diretoria.</p>}
+      <Churrasco atletas={atletas} diretor={diretor} meuAtletaId={meuAtletaId} />
       <div className="seg">
         {[1, 2, 3].map((n) => <button key={n} className={passo === n ? 'on' : ''} onClick={() => setPasso(n)}>{n} · {['Confirmações', 'Escalação', 'Resultado'][n - 1]}</button>)}
       </div>
@@ -341,6 +345,19 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
 
       {passo === 1 && (
         <div>
+          {diretor && !fechada && (
+            <div className={`aviso-conf ${confAbertas ? 'on' : ''}`}>
+              <span>{confAbertas ? '🔓 Confirmações abertas' : '🔒 Confirmações fechadas'}</span>
+              <button className="btn sm" onClick={() => run(() => db.setConfirmacoesAbertas(rodada.id, !confAbertas), confAbertas ? 'Confirmações fechadas' : 'Confirmações abertas')}>
+                {confAbertas ? 'Fechar' : 'Abrir'}
+              </button>
+            </div>
+          )}
+          {!diretor && !fechada && (
+            <p className="dica" style={{ margin: '0 0 12px' }}>
+              {confAbertas ? 'Toque no seu nome para confirmar presença.' : '🔒 Confirmações fechadas. A diretoria avisa quando abrir.'}
+            </p>
+          )}
           <div className="stat">
             <button className={`card ${detalhe === 'sim' ? 'on' : ''}`} onClick={() => setDetalhe(detalhe === 'sim' ? null : 'sim')}>
               <b>{sim.length}</b><span>Confirmados</span>
@@ -377,12 +394,23 @@ export default function Rodada({ atletas, diretor, meuAtletaId, passoInicial = 1
               </div>) })}
           </div></div>
           {diretor && <button className="btn" onClick={() => irParaMsg('lista', { tela: 'rodada', passo: 1, nome: 'Confirmações' })}>Cobrar quem ainda não confirmou</button>}
-          {diretor && <p className="dica">Toque no nome para alternar: confirmado → não vai → sem resposta.</p>}
+          {diretor && <p className="dica">Toque no nome para alternar: confirmado → não vai → sem resposta. Com as confirmações fechadas, só a diretoria marca.</p>}
         </div>
       )}
 
-      {passo === 2 && (
+      {passo === 2 && !escVisivel && (
+        <div className="card"><p className="dica" style={{ margin: 0 }}>A escalação ainda não foi liberada pela diretoria.</p></div>
+      )}
+      {passo === 2 && escVisivel && (
         <div>
+          {podeEditar && (
+            <div className={`aviso-conf ${rodada.escalacao_liberada ? 'on' : ''}`}>
+              <span>{rodada.escalacao_liberada ? '👀 Atletas já veem a escalação' : '🙈 Atletas ainda não veem a escalação'}</span>
+              <button className="btn sm" onClick={() => run(() => db.setEscalacaoLiberada(rodada.id, !rodada.escalacao_liberada), rodada.escalacao_liberada ? 'Escalação escondida dos atletas' : 'Escalação liberada para os atletas')}>
+                {rodada.escalacao_liberada ? 'Esconder' : 'Liberar'}
+              </button>
+            </div>
+          )}
           {podeEditar && (
             <div className="qtd-times">
               <span>Times:</span>

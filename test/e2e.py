@@ -92,6 +92,10 @@ async def main():
             # ---- rodada próxima: confirmações e escalação ----
             await aba(pg, 1); await pg.wait_for_selector('.stat')
             assert 'antiga' in await pg.locator('#root .dica').first.inner_text()
+            # a rodada nasce com as confirmações fechadas; a diretoria abre
+            assert 'fechadas' in await pg.locator('.aviso-conf').inner_text()
+            await pg.click('.aviso-conf button:has-text("Abrir")'); await pg.wait_for_selector('.aviso-conf.on')
+            assert 'abertas' in await pg.locator('.aviso-conf').inner_text()
             itens = pg.locator('#root .item')
             for i in range(14): await itens.nth(i).click(); await pg.wait_for_timeout(120)
             await pg.locator('#root .item:has-text("Pico")').click(); await pg.wait_for_timeout(200)  # 2º goleiro
@@ -206,8 +210,9 @@ async def main():
             assert '✓ vai' in await pg.locator('#root .item:has-text("Rodrigo")').inner_text()
             await pg.locator('#root .item:has-text("Wilson")').click(); await pg.wait_for_timeout(300)
             assert '✓ vai' not in await pg.locator('#root .item:has-text("Wilson")').inner_text()
-            await pg.locator('#root .seg button').nth(1).click(); await pg.wait_for_selector('.times')
-            assert await pg.locator('text=Sortear times').count() == 0
+            # escalação ainda não liberada: o atleta não vê os times (nem pela tela, nem pelo banco)
+            await pg.locator('#root .seg button').nth(1).click(); await pg.wait_for_selector('text=ainda não foi liberada')
+            assert await pg.locator('.times').count() == 0 and await pg.locator('text=Sortear times').count() == 0
             await pg.screenshot(path='test/t10-atleta.png')
 
             # ---- diretor volta, fecha a rodada e confere ranking e mensagens ----
@@ -364,6 +369,80 @@ async def main():
             pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
             await pg.click('text=Voltar senha para a padrão'); await pg.wait_for_timeout(500)
             assert USERS[EMAIL_ATLETA(idde('Wilson'))] == SENHA_PADRAO
+
+            # ---- confirmações abertas/fechadas, escalação liberada, churrasco e promover à diretoria ----
+            from mock_supabase import SESSAO
+            # o mock guarda uma sessão só: troca explicitamente entre a diretoria (pg) e o atleta (at)
+            DIR, IVAN = 'francoboaventura@icloud.com', EMAIL_ATLETA(idde('Ivan'))
+            def como(e): SESSAO['email'] = e
+            r_atual = max((r for r in DB['cond_rodadas']), key=lambda r: r['data'])
+            r_atual.update(status='aberta', gols_preto=None, gols_bege=None, vencedor=None, confirmacoes_abertas=False, escalacao_liberada=False)
+            DB['cond_confirmacoes'] = [c for c in DB['cond_confirmacoes'] if not (c['rodada_id'] == r_atual['id'] and c['atleta_id'] == idde('Ivan'))]
+            actx = await b.new_context(viewport={'width': 390, 'height': 844}); at = await actx.new_page()
+            at.on('pageerror', lambda e: erros.append(str(e)))
+            await actx.route('https://ynwumghaptydfoaskbui.supabase.co/**', handle)
+            async def entrar_nome(nome, senha):
+                await at.goto(URL); await at.wait_for_selector('#login select')
+                await at.select_option('#login select', idde(nome)); await at.fill('input[type=password]', senha); await at.click('button.btn')
+            async def rodada_atleta():
+                await at.click('nav button:has-text("Rodada")'); await at.wait_for_selector('.stat'); await at.wait_for_timeout(300)
+            await entrar_nome('Ivan', 'ivan1234'); await at.wait_for_selector('nav'); await rodada_atleta()
+            # fechadas: o atleta não confirma, e sem churrasco aberto não aparece cartão
+            assert 'Confirmações fechadas' in await at.locator('main').inner_text()
+            assert await at.locator('.aviso-conf').count() == 0 and await at.locator('.churras').count() == 0
+            await at.locator('#root .item:has-text("Ivan")').click(); await at.wait_for_selector('.toast:has-text("Confirmações fechadas")')
+            assert not any(c['atleta_id'] == idde('Ivan') and c['rodada_id'] == r_atual['id'] for c in DB['cond_confirmacoes'])
+            await at.locator('#root .seg button').nth(1).click(); await at.wait_for_selector('text=ainda não foi liberada')
+            await at.screenshot(path='test/t30-atleta-fechado.png')
+            # diretoria: abre as confirmações, libera a escalação, abre o churrasco e promove o Lucas
+            como(DIR); await aba(pg, 0); await aba(pg, 1); await pg.locator('#root .seg button').nth(0).click(); await pg.wait_for_selector('.aviso-conf')
+            await pg.click('.aviso-conf button:has-text("Abrir")'); await pg.wait_for_selector('.aviso-conf.on')
+            assert r_atual['confirmacoes_abertas'] is True
+            await pg.locator('#root .seg button').nth(1).click(); await pg.wait_for_selector('.aviso-conf')
+            assert 'ainda não veem' in await pg.locator('.aviso-conf').inner_text()
+            await pg.click('.aviso-conf button:has-text("Liberar")'); await pg.wait_for_selector('.aviso-conf.on')
+            assert r_atual['escalacao_liberada'] is True
+            await pg.click('text=Abrir lista de presença do churrasco')
+            await pg.fill('.churras input[type=date]', '2026-12-19'); await pg.click('.churras button:has-text("Abrir a lista")')
+            await pg.wait_for_selector('.churras h4:has-text("Churrasco dos Condores")')
+            assert 'lista aberta' in await pg.locator('.churras .sub').inner_text()
+            await pg.screenshot(path='test/t31-churrasco-diretoria.png')
+            await aba(pg, 0); await pg.locator('.item:has-text("Lucas") .more:not([title])').click()
+            pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
+            await pg.click('text=Tornar diretoria'); await pg.wait_for_selector('.toast:has-text("agora é diretoria")')
+            assert next(u for u in DB['cond_usuarios'] if u['email'] == EMAIL_ATLETA(idde('Lucas')))['papel'] == 'diretor'
+            assert '⭐ diretoria' in await pg.locator('.item:has-text("Lucas") .sub').inner_text()
+            # ninguém tira a si mesmo da diretoria (o Franco do teste entra por e-mail; o banco recusa pelo atleta ligado)
+            # atleta: agora confirma, vê a escalação e marca o churrasco
+            como(IVAN); await at.reload(); await at.wait_for_selector('nav'); await rodada_atleta()
+            assert 'Toque no seu nome' in await at.locator('main').inner_text()
+            await at.locator('#root .item:has-text("Ivan")').click(); await at.wait_for_timeout(400)
+            assert '✓ vai' in await at.locator('#root .item:has-text("Ivan")').inner_text()
+            await at.click('.churras button:has-text("Vou")'); await at.wait_for_timeout(400)
+            assert any(p['atleta_id'] == idde('Ivan') and p['status'] == 'S' for p in DB['cond_evento_presencas'])
+            assert '1 vão' in await at.locator('.churras .sub').inner_text()
+            assert await at.locator('.churras .acoes').count() == 0   # atleta não fecha nem copia a lista
+            await at.locator('#root .seg button').nth(1).click(); await at.wait_for_timeout(400)
+            assert await at.locator('text=ainda não foi liberada').count() == 0 and await at.locator('.times').count() == 1
+            assert await at.locator('text=Sortear times').count() == 0 and await at.locator('.aviso-conf').count() == 0
+            await at.screenshot(path='test/t32-atleta-aberto.png')
+            # diretoria fecha o churrasco e copia a lista
+            como(DIR); await aba(pg, 0); await aba(pg, 1); await pg.wait_for_selector('.churras')
+            await pg.click('.churras button:has-text("Fechar a lista")'); await pg.wait_for_selector('.churras .sub:has-text("lista fechada")')
+            # atleta com a lista fechada: não muda a resposta (tela e banco)
+            como(IVAN); await at.reload(); await at.wait_for_selector('nav'); await rodada_atleta()
+            await at.click('.churras button:has-text("Não vou")'); await at.wait_for_selector('.toast:has-text("fechada")')
+            assert next(p for p in DB['cond_evento_presencas'] if p['atleta_id'] == idde('Ivan'))['status'] == 'S'
+            # Lucas virou diretoria antes do primeiro acesso: mesmo assim cria a própria senha
+            await at.click('header a:has-text("sair")'); await entrar_nome('Lucas', SENHA_PADRAO)
+            await at.wait_for_selector('text=Bem-vindo, Lucas!'); assert await at.locator('text=Crie sua senha').count() == 1
+            await at.fill('input[autocomplete=new-password] >> nth=0', 'lucas123'); await at.fill('input[autocomplete=new-password] >> nth=1', 'lucas123')
+            await at.fill('input[type=tel]', '51 96666-5555'); await at.click('text=Salvar e entrar')
+            await at.wait_for_selector('.voto-pop'); await at.click('text=Votar depois'); await at.wait_for_selector('nav')
+            navs = await at.locator('nav button').all_inner_texts()
+            assert len(navs) == 5 and any('Votação' in t for t in navs), navs
+            assert 'diretoria' in await at.locator('header .usr').inner_text()
+            await actx.close()
 
             print('ERROS:', erros)
             assert not erros, erros

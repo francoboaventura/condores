@@ -67,7 +67,7 @@ function Shell() {
   useEffect(() => {
     if (!perfil?.atleta_id || !atletasOk) return
     const eu = atletas.find((a) => a.id === perfil.atleta_id)
-    if (perfil.papel === 'atleta' && (perfil.trocar_senha || !eu?.cadastro_ok_em)) return
+    if (perfil.trocar_senha || (perfil.papel === 'atleta' && !eu?.cadastro_ok_em)) return
     db.jaVotei(perfil.atleta_id).then((j) => setVoto(!j)).catch(() => {})
   }, [perfil, atletasOk])
   // ao trocar de tela, volta para o topo (senão a pessoa cai no meio da página)
@@ -81,7 +81,8 @@ function Shell() {
 
   // primeiro acesso do atleta: senha própria + dados; depois, o pop-up da votação
   const meuAtleta = atletas.find((a) => a.id === perfil.atleta_id)
-  if (perfil.papel === 'atleta' && meuAtleta && (perfil.trocar_senha || !meuAtleta.cadastro_ok_em)) {
+  // vale também para quem foi promovido à diretoria antes do primeiro acesso: ninguém fica com a senha padrão
+  if (meuAtleta && (perfil.trocar_senha || (perfil.papel === 'atleta' && !meuAtleta.cadastro_ok_em))) {
     const pronto = async () => { await recarregarAtletas(); setPerfil(await db.meuPerfil()) }
     return <div className="app"><PrimeiroAcesso atleta={meuAtleta} trocarSenha={perfil.trocar_senha} onPronto={pronto} onSair={() => supabase.auth.signOut()} /></div>
   }
