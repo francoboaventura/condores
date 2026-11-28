@@ -80,6 +80,12 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
     setMenu(null)
     await run(() => db.marcarSaida(a.id), `${a.nome} saiu do time`)
   }
+  async function resetarSenha() {
+    const a = menu
+    if (!confirm(`Voltar a senha de ${a.nome} para a senha padrão? No próximo acesso ele cria uma senha nova.`)) return
+    setMenu(null)
+    try { await db.resetarSenhaAtleta(a.id); toast(`Senha de ${a.nome} voltou para a padrão`) } catch (e) { toast(e.message) }
+  }
   async function voltouAoTime() {
     const a = menu; setMenu(null)
     try { await db.voltarAoTime(a.id); setSaidos(await db.listarSaidos()); await recarregar(); toast(`${a.nome} voltou ao time`) }
@@ -102,7 +108,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
   return (
     <section className="tela on">
       {temporada && temporada.campeao_nome && (
-        <div className="campeao-faixa home" onClick={verRanking}>
+        <div className="campeao-faixa home" onClick={verRanking || undefined} style={verRanking ? undefined : { cursor: 'default' }}>
           <span className="tr">🏆</span>
           <div>
             <b>Campeão {temporada.ano}: {temporada.campeao_nome}</b>
@@ -201,6 +207,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
               <>
                 <button onClick={toggleDM}>{menu.dm ? '✅ Voltar do DM' : '🏥 Enviar para o DM'}</button>
                 <button onClick={toggleAfastado}>{menu.afastado ? '✅ Voltar ao time' : '⏸ Afastamento justificado'}</button>
+                <button onClick={resetarSenha}>🔑 Voltar senha para a padrão</button>
                 <button onClick={() => setMenu(null)}>Fechar</button>
                 <button className="perigo" onClick={saiuDoTime}>🚪 Saiu do time</button>
               </>

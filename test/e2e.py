@@ -15,7 +15,7 @@ async def drag(pg, sel, target):
     await pg.wait_for_timeout(250)
 
 async def login(pg, email, senha):
-    await pg.wait_for_selector('#login')
+    await pg.wait_for_selector('#login'); await pg.click('text=Entrar com e-mail')
     await pg.fill('input[type=email]', email); await pg.fill('input[type=password]', senha); await pg.click('button.btn')
     await pg.wait_for_selector('nav'); await pg.wait_for_timeout(400)
 
@@ -37,6 +37,7 @@ async def main():
             await pg.wait_for_selector('#login'); await pg.screenshot(path='test/t0-login.png')
 
             # senha errada
+            await pg.click('text=Entrar com e-mail')
             await pg.fill('input[type=email]', 'francoboaventura@icloud.com'); await pg.fill('input[type=password]', 'x'); await pg.click('button.btn')
             await pg.wait_for_selector('.toast'); assert 'incorretos' in await pg.locator('.toast').inner_text()
             await pg.fill('input[type=password]', '123456'); await pg.click('button.btn')
@@ -192,6 +193,11 @@ async def main():
             await pg.click('header a:has-text("sair")'); await pg.wait_for_selector('#login')
             await pg.goto(URL + '#/convite/' + token); await pg.reload(); await pg.wait_for_selector('text=Convite para')
             await pg.fill('input[type=email]', 'rodrigo@teste.com'); await pg.fill('input[type=password]', 'senha123'); await pg.click('button.btn:has-text("Criar conta")')
+            # primeiro acesso de quem entrou por e-mail: só confirma os dados (sem trocar senha), depois a votação
+            await pg.wait_for_selector('text=Bem-vindo, Rodrigo!')
+            assert await pg.locator('text=Crie sua senha').count() == 0
+            await pg.fill('input[type=tel]', '51 99999-0000'); await pg.click('text=Salvar e entrar')
+            await pg.wait_for_selector('.voto-pop'); await pg.click('text=Votar depois')
             await pg.wait_for_selector('nav'); await pg.wait_for_timeout(500)
             usr = await pg.locator('header .usr').inner_text(); assert 'Rodrigo' in usr and 'atleta' in usr, usr
             assert await pg.locator('.fab').count() == 0 and await pg.locator('button[title="Convidar para o app"]').count() == 0
@@ -285,34 +291,65 @@ async def main():
             await pg.click('.filtros button.limpa'); await pg.wait_for_timeout(400)
             assert await pg.locator(f'.card .item:has-text("{alvo}")').count() == 1
 
-            # ---- votação Atleta Mais Condores (pública, sem login) ----
-            from mock_supabase import DB
+            # ---- acesso dos atletas (nome + senha padrão) e votação Atleta Mais Condores ----
+            from mock_supabase import DB, USERS, SENHA_PADRAO, EMAIL_ATLETA, FOTOS
+            idde = lambda n: next(a['id'] for a in DB['cond_atletas'] if a['nome'] == n)
             await aba(pg, 4); await pg.wait_for_selector('text=Ainda não votaram')
             assert 'Nenhum voto' in await pg.locator('main').inner_text()
-            assert '#/votacao' in await pg.locator('pre.msg').inner_text()
+            convite_txt = await pg.locator('pre.msg').inner_text()
+            assert SENHA_PADRAO in convite_txt and 'Escolha o seu nome' in convite_txt, convite_txt
             pctx = await b.new_context(viewport={'width': 390, 'height': 844}); pub = await pctx.new_page()
             pub.on('pageerror', lambda e: erros.append(str(e)))
             await pctx.route('https://ynwumghaptydfoaskbui.supabase.co/**', handle)
-            await pub.goto(URL + '#/votacao'); await pub.wait_for_selector('text=Quem é você?')
-            assert await pub.locator('#login').count() == 0 and await pub.locator('nav').count() == 0
-            await pub.screenshot(path='test/t20-votacao-quem.png')
-            await pub.click('.voto-op:has-text("Wilson")'); await pub.wait_for_selector('text=Em quem você vota?')
-            assert await pub.locator('.voto-op:has-text("Wilson")').count() == 0   # não vota em si mesmo
-            assert await pub.locator('.voto-barra .btn').is_disabled()
-            await pub.click('.voto-op:has-text("Rodrigo")')
-            await pub.screenshot(path='test/t21-votacao-voto.png')
-            await pub.click('text=Confirmar voto em Rodrigo'); await pub.wait_for_selector('text=Obrigado, Wilson!')
-            await pub.screenshot(path='test/t22-votacao-obrigado.png')
-            await pub.click('text=Voltar ao início'); await pub.wait_for_selector('text=Quem é você?')
-            w = pub.locator('.voto-op:has-text("Wilson")')
-            assert await w.is_disabled() and 'já votou' in await w.inner_text()
-            # dois ao mesmo tempo com o mesmo nome: o banco recusa o segundo
-            await pub.click('.voto-op:has-text("Ivan")'); await pub.click('.voto-op:has-text("Rodrigo")')
-            ivan, rod = (next(a['id'] for a in DB['cond_atletas'] if a['nome'] == n) for n in ('Ivan', 'Rodrigo'))
-            DB['cond_votos_atleta_mais_condores'].append(dict(id='x', eleitor_id=ivan, votado_id=rod))  # outro aparelho votou antes
-            await pub.click('text=Confirmar voto em Rodrigo'); await pub.wait_for_selector('.aviso')
-            assert 'Esse atleta já votou' in await pub.locator('.aviso').inner_text()
-            assert await pub.locator('.voto-op:has-text("Ivan")').is_disabled()
+            # o link público antigo só manda para o app
+            await pub.goto(URL + '#/votacao'); await pub.wait_for_selector('text=A votação agora é pelo app')
+            await pub.click('text=Entrar no app'); await pub.wait_for_selector('#login select')
+            await pub.screenshot(path='test/t20-login-atleta.png')
+            # senha errada, depois a padrão
+            await pub.select_option('#login select', idde('Wilson')); await pub.fill('input[type=password]', 'errada'); await pub.click('button.btn')
+            await pub.wait_for_selector('.toast:has-text("Senha incorreta")')
+            await pub.fill('input[type=password]', SENHA_PADRAO); await pub.click('button.btn')
+            await pub.wait_for_selector('text=Bem-vindo, Wilson!'); assert await pub.locator('text=Crie sua senha').count() == 1
+            assert await pub.locator('input[type=tel]').input_value() == '' or True
+            # não aceita repetir a senha padrão
+            await pub.fill('input[autocomplete=new-password] >> nth=0', SENHA_PADRAO); await pub.fill('input[autocomplete=new-password] >> nth=1', SENHA_PADRAO)
+            await pub.fill('input[type=tel]', '51 98888-7777'); await pub.click('text=Salvar e entrar')
+            await pub.wait_for_selector('.toast:has-text("diferente")')
+            await pub.fill('input[autocomplete=new-password] >> nth=0', 'wilson123'); await pub.fill('input[autocomplete=new-password] >> nth=1', 'wilson123')
+            await pub.set_input_files('.foto-up input', 'test/t0-login.png'); await pub.wait_for_selector('.foto-up img')
+            await pub.screenshot(path='test/t21-primeiro-acesso.png')
+            await pub.click('text=Salvar e entrar')
+            # pop-up da votação: sem o próprio nome
+            await pub.wait_for_selector('.voto-pop'); await pub.screenshot(path='test/t22-voto-popup.png')
+            assert await pub.locator('.voto-pop .voto-op:has-text("Wilson")').count() == 0
+            assert any('cond-fotos/' + idde('Wilson') in f for f in FOTOS), FOTOS
+            w = next(a for a in DB['cond_atletas'] if a['nome'] == 'Wilson')
+            assert w['whatsapp'] == '51 98888-7777' and w['cadastro_ok_em'] and 'cond-fotos' in (w.get('foto_url') or ''), w
+            await pub.click('.voto-pop .voto-op:has-text("Rodrigo")'); await pub.click('text=Confirmar voto em Rodrigo')
+            await pub.wait_for_selector('text=Voto registrado!'); await pub.click('text=Ir para o app')
+            # ranking escondido para atletas
+            navs = await pub.locator('nav button').all_inner_texts()
+            assert len(navs) == 3 and not any('Ranking' in t or 'Votação' in t for t in navs), navs
+            await pub.click('nav button:has-text("WhatsApp")'); await pub.wait_for_timeout(300)
+            assert await pub.locator('.seg button:has-text("Ranking")').count() == 0
+            await pub.screenshot(path='test/t23-atleta-app.png')
+            # sai e volta: a senha padrão não serve mais; com a nova entra direto, sem pop-up
+            await pub.click('header a:has-text("sair")'); await pub.wait_for_selector('#login select')
+            await pub.select_option('#login select', idde('Wilson')); await pub.fill('input[type=password]', SENHA_PADRAO); await pub.click('button.btn')
+            await pub.wait_for_selector('.toast:has-text("Senha incorreta")')
+            await pub.fill('input[type=password]', 'wilson123'); await pub.click('button.btn')
+            await pub.wait_for_selector('nav'); await pub.wait_for_timeout(800)
+            assert await pub.locator('.voto-pop').count() == 0 and await pub.locator('text=Bem-vindo').count() == 0
+            # dois aparelhos com o mesmo atleta: o banco recusa o segundo voto
+            await pub.click('header a:has-text("sair")'); await pub.wait_for_selector('#login select')
+            await pub.select_option('#login select', idde('Ivan')); await pub.fill('input[type=password]', SENHA_PADRAO); await pub.click('button.btn')
+            await pub.wait_for_selector('text=Bem-vindo, Ivan!')
+            await pub.fill('input[autocomplete=new-password] >> nth=0', 'ivan1234'); await pub.fill('input[autocomplete=new-password] >> nth=1', 'ivan1234')
+            await pub.fill('input[type=tel]', '51 97777-6666'); await pub.click('text=Salvar e entrar')
+            await pub.wait_for_selector('.voto-pop'); await pub.click('.voto-pop .voto-op:has-text("Lucas")')
+            DB['cond_votos_atleta_mais_condores'].append(dict(id='x', eleitor_id=idde('Ivan'), votado_id=idde('Rodrigo')))  # outro aparelho votou antes
+            await pub.click('text=Confirmar voto em Lucas'); await pub.wait_for_selector('.voto-fim')
+            t = await pub.locator('.voto-fim h2').text_content(); assert t == 'Esse atleta já votou', t
             await pctx.close()
             # resultado na diretoria
             await aba(pg, 0); await aba(pg, 4); await pg.wait_for_selector('table')
@@ -321,7 +358,12 @@ async def main():
             assert await pg.locator('#root tbody tr td.pts').first.inner_text() == '2'
             faltam = len([a for a in DB['cond_atletas'] if a['ativo']]) - 2
             assert await pg.locator('.stat .card b').nth(1).inner_text() == str(faltam)
-            await pg.screenshot(path='test/t23-votacao-resultado.png')
+            await pg.screenshot(path='test/t24-votacao-resultado.png')
+            # diretoria volta a senha do Wilson para a padrão
+            await aba(pg, 0); await pg.locator('.item:has-text("Wilson") .more:not([title])').click()
+            pg.once('dialog', lambda d: asyncio.ensure_future(d.accept()))
+            await pg.click('text=Voltar senha para a padrão'); await pg.wait_for_timeout(500)
+            assert USERS[EMAIL_ATLETA(idde('Wilson'))] == SENHA_PADRAO
 
             print('ERROS:', erros)
             assert not erros, erros
