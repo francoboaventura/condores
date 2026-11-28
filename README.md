@@ -12,8 +12,10 @@ App de gestão do grupo de futebol Condores: atletas, confirmações, escalaçã
 
 ## Acessos
 
-- **Diretoria**: cadastra atletas, escala, lança resultado, corrige placar, convida.
-- **Atleta (usuário comum)**: vê tudo e confirma a própria presença.
+- **Diretoria**: tudo — cadastra atletas, abre e fecha as confirmações, escala e libera a escalação, lança resultado, corrige placar, convida, abre a lista do churrasco, vê ranking e resultado da votação. No menu ⋯ do atleta, "⭐ Tornar diretoria" / "👤 Tirar da diretoria" (ninguém tira a si mesmo).
+- **Atleta**: confirma a própria presença só quando a diretoria abre as confirmações; vê a escalação da rodada só depois de liberada (rodadas antigas sempre); marca "vou / não vou" no churrasco enquanto a lista está aberta; vota na Atleta Mais Condores. Não vê ranking nem resultado da votação.
+- As travas de confirmação, escalação e churrasco estão no banco, não só na tela (`dados/permissoes-e-churrasco.sql`).
+- Quem vira diretoria antes do primeiro acesso também precisa criar a própria senha.
 - Convite: na tela Atletas, o ✉ ao lado do nome gera um link pessoal (usuário comum ou diretor). Quem abre cria e-mail + senha e a conta já nasce ligada à ficha.
 
 ## Atletas
@@ -62,6 +64,10 @@ As três caixas de contagem (Confirmados / Não vão / Sem resposta) abrem ao to
 - Em quem cada um votou e a contagem só aparecem para a diretoria, na aba **Votação** (ranking, total de votos, quantos faltam e mensagem pronta para o WhatsApp).
 - O link público antigo (`#/votacao`) agora só avisa que a votação é pelo app.
 - Banco: tabela `cond_votos_atleta_mais_condores`, função `cond_votacao_resultado`. SQL em `dados/votacao-atleta-mais-condores.sql` e `dados/acesso-atletas.sql`.
+
+## Churrasco
+
+Na tela Rodada, a diretoria abre a lista de presença do churrasco (nome e data). Cada atleta marca "Vou" ou "Não vou" enquanto a lista estiver aberta; a diretoria fecha, reabre, copia a lista para o WhatsApp e, com a lista fechada, pode abrir um churrasco novo. Tabelas `cond_eventos` e `cond_evento_presencas`.
 
 ## Histórico
 

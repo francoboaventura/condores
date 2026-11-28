@@ -17,9 +17,10 @@ CAMISA = {"Wilson":(17,"G"),"Rodrigo":(3,"M"),"Ivan":(1,"G"),"Lucas":(99,"G"),"E
 DB = {
     'cond_atletas': [dict(id=str(uuid.uuid4()), nome=n, posicao={'Pico':'GOL','Cassio':'GOL','Ivan':'ZAG','Edson':'ZAG','Carlos':'ZAG','Jura':'ZAG','Rafael':'ZAG','Wilson':'ATA','Lucas':'ATA','Alisson':'ATA','Guga':'ATA','Anderson':'ATA'}.get(n,'MEI'), aniv_dia=d, aniv_mes=m,
                           whatsapp=None, foto_url=None, dm=False, afastado=False, ativo=True, numero=CAMISA.get(n,(None,None))[0], tamanho=CAMISA.get(n,(None,None))[1]) for n,d,m in nomes],
-    'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, vice=None, times_qtd=2, origem='planilha')], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
+    'cond_rodadas': [dict(id='r-antiga', data='2026-09-14', status='aberta', gols_preto=None, gols_bege=None, vencedor=None, vice=None, times_qtd=2, origem='planilha', confirmacoes_abertas=False, escalacao_liberada=False)], 'cond_confirmacoes': [], 'cond_escalacoes': [], 'cond_usuarios': [dict(email=e, nome=n, papel='diretor', atleta_id=None) for e,n in DIRETORIA.items()], 'cond_convites': CONVITES,
     'cond_temporadas': [], 'cond_temporada_ranking': [],
     'cond_votos_atleta_mais_condores': [],
+    'cond_eventos': [], 'cond_evento_presencas': [],
 }
 # acesso dos atletas por nome + senha padrão (contas "por trás")
 SENHA_PADRAO = 'senha-teste-123'
@@ -30,6 +31,18 @@ for _a in DB['cond_atletas']:
 FOTOS = []
 def eu_usuario(): return next((u for u in DB['cond_usuarios'] if u['email'] == SESSAO['email']), None)
 def meu_atleta(): u = eu_usuario(); return u and u.get('atleta_id')
+def sou_diretoria(): u = eu_usuario(); return bool(u and u.get('papel') == 'diretor' and not u.get('trocar_senha'))
+def rodada(i): return next((r for r in DB['cond_rodadas'] if r['id'] == i), {})
+# mesmas regras do banco (dados/permissoes-e-churrasco.sql)
+def conf_aberta(i): r = rodada(i); return bool(r.get('confirmacoes_abertas')) and r.get('status') != 'encerrada'
+def esc_visivel(i): r = rodada(i); return bool(r.get('escalacao_liberada')) or r.get('status') == 'encerrada'
+def evento_aberto(i): return bool(next((e for e in DB['cond_eventos'] if e['id'] == i), {}).get('aberta'))
+def pode_escrever(tabela, linha):
+    if sou_diretoria(): return True
+    if tabela == 'cond_confirmacoes': return linha.get('atleta_id') == meu_atleta() and conf_aberta(linha.get('rodada_id'))
+    if tabela == 'cond_evento_presencas': return linha.get('atleta_id') == meu_atleta() and evento_aberto(linha.get('evento_id'))
+    if tabela in ('cond_eventos', 'cond_rodadas', 'cond_escalacoes'): return False
+    return True
 
 def venc(r):
     if r.get('times_qtd', 2) == 2 and r.get('gols_preto') is not None and r.get('gols_bege') is not None:
@@ -105,7 +118,7 @@ def embed(rows, select):
     out = []
     for r in rows:
         r = dict(r)
-        escs = [dict(e) for e in DB['cond_escalacoes'] if e['rodada_id'] == r['id']]
+        escs = [dict(e) for e in DB['cond_escalacoes'] if e['rodada_id'] == r['id'] and (sou_diretoria() or esc_visivel(r['id']))]
         if 'cond_atletas' in m.group(1):
             for e in escs:
                 a = next((a for a in DB['cond_atletas'] if a['id'] == e['atleta_id']), None)
@@ -194,6 +207,15 @@ async def handle(route, request):
         USERS[EMAIL_ATLETA(body['p_atleta'])] = SENHA_PADRAO
         next(u for u in DB['cond_usuarios'] if u['email'] == EMAIL_ATLETA(body['p_atleta']))['trocar_senha'] = True
         return await send(None)
+    if path.startswith('/rest/v1/rpc/cond_papeis'):
+        if not sou_diretoria(): return await send(dict(message='Só a diretoria pode ver isso.'), 400)
+        return await send([dict(atleta_id=u['atleta_id'], papel=u['papel']) for u in DB['cond_usuarios'] if u.get('atleta_id') and u['email'] == EMAIL_ATLETA(u['atleta_id'])])
+    if path.startswith('/rest/v1/rpc/cond_definir_papel'):
+        if not sou_diretoria(): return await send(dict(message='Só a diretoria pode fazer isso.'), 400)
+        if body['p_papel'] == 'atleta' and body['p_atleta'] == meu_atleta(): return await send(dict(message='Você não pode tirar a si mesmo da diretoria.'), 400)
+        u = next((u for u in DB['cond_usuarios'] if u['email'] == EMAIL_ATLETA(body['p_atleta'])), None)
+        if not u: return await send(dict(message='Esse atleta ainda não tem acesso ao app.'), 400)
+        u['papel'] = body['p_papel']; return await send(None)
     if path.startswith('/rest/v1/rpc/cond_senha_padrao'):
         return await send(SENHA_PADRAO)
     if path.startswith('/storage/v1/object/public/'):
@@ -223,32 +245,38 @@ async def handle(route, request):
     if tabela == 'cond_historico': return await send(filtrar(view_historico(), qs))
     rows = DB[tabela]
     if method == 'GET':
-        res = filtrar(rows, qs); res = embed(res, qs.get('select', ['*'])[0])
+        res = filtrar(rows, qs)
+        if tabela == 'cond_escalacoes' and not sou_diretoria(): res = [e for e in res if esc_visivel(e['rodada_id'])]
+        res = embed(res, qs.get('select', ['*'])[0])
         if 'object' in request.headers.get('accept', ''): return await send(res[0] if res else None)
         return await send(res)
     prefer = request.headers.get('prefer', '')
     if method == 'POST':
         items = body if isinstance(body, list) else [body]
+        if not all(pode_escrever(tabela, it) for it in items):
+            return await send(dict(code='42501', message='new row violates row-level security policy'), 403)
         saved = []
         for it in items:
             it = dict(it)
             if 'resolution=merge-duplicates' in prefer:
-                key = ['rodada_id', 'atleta_id'] if tabela == 'cond_confirmacoes' else ['id']
+                key = ['rodada_id', 'atleta_id'] if tabela == 'cond_confirmacoes' else ['evento_id', 'atleta_id'] if tabela == 'cond_evento_presencas' else ['id']
                 ex = next((r for r in rows if all(r.get(k) == it.get(k) for k in key) and it.get(key[0]) is not None), None)
                 if ex: ex.update(it); saved.append(ex); continue
             if 'id' not in it: it['id'] = str(uuid.uuid4())
-            if tabela == 'cond_rodadas': it.setdefault('status', 'aberta'); it.setdefault('gols_preto', None); it.setdefault('gols_bege', None); it.setdefault('vencedor', None); it.setdefault('vice', None); it.setdefault('times_qtd', 2)
+            if tabela == 'cond_eventos': it.setdefault('aberta', True); it.setdefault('criado_em', str(len(rows)).zfill(4))
+            if tabela == 'cond_rodadas': it.setdefault('confirmacoes_abertas', False); it.setdefault('escalacao_liberada', False); it.setdefault('status', 'aberta'); it.setdefault('gols_preto', None); it.setdefault('gols_bege', None); it.setdefault('vencedor', None); it.setdefault('vice', None); it.setdefault('times_qtd', 2)
             if tabela == 'cond_atletas': it.setdefault('dm', False); it.setdefault('afastado', False); it.setdefault('ativo', True); it.setdefault('numero', None); it.setdefault('tamanho', None); it.setdefault('posicao', 'MEI')
             if tabela == 'cond_escalacoes': it.setdefault('goleiro', False); it.setdefault('atleta_id', None); it.setdefault('convidado_nome', None); it.setdefault('convidado_pos', None)
             rows.append(it); saved.append(it)
         return await send(saved if isinstance(body, list) else (saved[0] if 'object' in request.headers.get('accept', '') else saved), 201)
     if method == 'PATCH':
+        if tabela in ('cond_rodadas', 'cond_eventos') and not sou_diretoria(): return await send([])  # RLS: nenhuma linha muda
         for r in filtrar(rows, qs):
             r.update(body)
             if tabela == 'cond_rodadas' and r.get('gols_preto') is not None: r['vencedor'] = venc(r)
         return await send([])
     if method == 'DELETE':
-        alvo = filtrar(rows, qs)
+        alvo = [r for r in filtrar(rows, qs) if pode_escrever(tabela, r)]  # RLS: só apaga o que pode
         DB[tabela] = [r for r in rows if r not in alvo]
         return await send([])
     await send({'message': 'não tratado'}, 500)

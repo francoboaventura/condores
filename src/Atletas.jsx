@@ -15,6 +15,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
   const [fSit, setFSit] = useState(null)      // apto | dm | afastado
   const [ordem, setOrdem] = useState('nome')  // nome | numero | posicao | aniv
   const [saidos, setSaidos] = useState([])    // quem saiu do time (ativo = false)
+  const [diretores, setDiretores] = useState([]) // atleta_id de quem é diretoria (conta de entrada por nome)
 
   const noDM = atletas.filter((a) => a.dm).length
   const afastados = atletas.filter((a) => a.afastado).length
@@ -35,6 +36,9 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
   const filtrando = fPos || fSit
 
   useEffect(() => { if (diretor) db.listarUsuarios().then(setUsuarios).catch(() => {}) }, [diretor, atletas])
+  const carregarPapeis = () => db.papeis().then((l) => setDiretores(l.filter((x) => x.papel === 'diretor').map((x) => x.atleta_id))).catch(() => {})
+  useEffect(() => { if (diretor) carregarPapeis() }, [diretor, atletas])
+  const ehDiretor = (a) => diretores.includes(a.id)
   useEffect(() => { if (fSit === 'saiu') db.listarSaidos().then(setSaidos).catch((e) => toast(e.message)) }, [fSit, atletas])
 
   const run = async (fn, okMsg) => {
@@ -85,6 +89,15 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
     if (!confirm(`Voltar a senha de ${a.nome} para a senha padrão? No próximo acesso ele cria uma senha nova.`)) return
     setMenu(null)
     try { await db.resetarSenhaAtleta(a.id); toast(`Senha de ${a.nome} voltou para a padrão`) } catch (e) { toast(e.message) }
+  }
+  async function trocarPapel() {
+    const a = menu, vira = ehDiretor(a) ? 'atleta' : 'diretor'
+    if (!confirm(vira === 'diretor'
+      ? `Tornar ${a.nome} diretoria? Ele passa a ver e mexer em tudo: escalação, resultado, ranking e votação.`
+      : `Tirar ${a.nome} da diretoria? Ele volta a ser atleta.`)) return
+    setMenu(null)
+    try { await db.definirPapel(a.id, vira); await carregarPapeis(); toast(vira === 'diretor' ? `${a.nome} agora é diretoria` : `${a.nome} voltou a ser atleta`) }
+    catch (e) { toast(e.message) }
   }
   async function voltouAoTime() {
     const a = menu; setMenu(null)
@@ -144,7 +157,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
               <div className={`av ${a.numero != null ? 'camisa' : ''}`}>{a.numero != null ? a.numero : ini(a.nome)}</div>
               <div className="nome" onClick={() => abrirEditar(a)} style={{ cursor: diretor ? 'pointer' : 'default' }}>
                 {a.nome} {a.dm && <span className="tag dm">DM</span>}{a.afastado && <span className="tag dm">afastado</span>}{a.ativo === false && <span className="tag dm">saiu</span>}
-                <span className="sub">{a.tamanho ? `👕 ${a.tamanho} · ` : ''}🎂 {aniv(a) || '—'} · 📱 {a.whatsapp || '—'}{diretor && comConta(a) ? ` · ${comConta(a).papel === 'diretor' ? '⭐ diretoria' : '✅ tem acesso'}` : ''}</span>
+                <span className="sub">{a.tamanho ? `👕 ${a.tamanho} · ` : ''}🎂 {aniv(a) || '—'} · 📱 {a.whatsapp || '—'}{diretor && (ehDiretor(a) || comConta(a)) ? ` · ${ehDiretor(a) || comConta(a)?.papel === 'diretor' ? '⭐ diretoria' : '✅ tem acesso'}` : ''}</span>
               </div>
               {diretor
                 ? <PosBtn pos={a.posicao} onChange={(p) => run(() => db.atualizarAtleta(a.id, { posicao: p }))} />
@@ -208,6 +221,7 @@ export default function Atletas({ atletas, recarregar, diretor, temporada, verRa
                 <button onClick={toggleDM}>{menu.dm ? '✅ Voltar do DM' : '🏥 Enviar para o DM'}</button>
                 <button onClick={toggleAfastado}>{menu.afastado ? '✅ Voltar ao time' : '⏸ Afastamento justificado'}</button>
                 <button onClick={resetarSenha}>🔑 Voltar senha para a padrão</button>
+                <button onClick={trocarPapel}>{ehDiretor(menu) ? '👤 Tirar da diretoria' : '⭐ Tornar diretoria'}</button>
                 <button onClick={() => setMenu(null)}>Fechar</button>
                 <button className="perigo" onClick={saiuDoTime}>🚪 Saiu do time</button>
               </>

@@ -226,3 +226,18 @@ button.item.voto-op .marca{color:var(--bege);font-weight:800;font-size:18px;widt
 .voto-lista{overflow-y:auto;flex:1;margin:0 -16px;padding:0 16px;border-top:1px solid var(--linha);border-bottom:1px solid var(--linha)}
 .voto-pop button.item.voto-op.on{margin:0 -16px;padding-left:16px;padding-right:16px;width:calc(100% + 32px)}
 .voto-pop .voto-fim{padding:24px 8px 8px}
+
+/* faixa de aberto/fechado (confirmações, escalação liberada) */
+.aviso-conf{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--preto2);border:1px solid var(--linha);border-radius:10px;padding:8px 10px 8px 12px;margin-bottom:12px;font-size:13px;color:var(--mudo)}
+.aviso-conf.on{border-color:var(--bege2);color:var(--bege)}
+
+/* churrasco */
+.churras{border-color:var(--bege2)}
+.churras h4{font-size:15px;color:var(--bege);margin-bottom:2px}
+.churras .sub{font-size:12px;color:var(--mudo)}
+.churras .escolha{display:flex;gap:8px;margin:12px 0 4px}
+.churras .escolha .btn{flex:1}
+.churras .escolha .btn.on{outline:2px solid var(--bege);outline-offset:2px}
+.churras ul{list-style:none;font-size:13px;line-height:1.7;margin-top:6px}
+.churras .acoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.churras .fechar{background:none;border:0;color:var(--mudo);font-size:12px;text-decoration:underline;cursor:pointer}

@@ -146,3 +146,22 @@ export async function votar(eleitor_id, votado_id) {
 }
 // só diretoria
 export const votacaoResultado = () => ok(supabase.rpc('cond_votacao_resultado'))
+
+// ---------- rodada: confirmações abertas e escalação liberada (só diretoria muda) ----------
+export const setConfirmacoesAbertas = (id, aberta) => ok(supabase.from('cond_rodadas').update({ confirmacoes_abertas: aberta }).eq('id', id))
+export const setEscalacaoLiberada = (id, liberada) => ok(supabase.from('cond_rodadas').update({ escalacao_liberada: liberada }).eq('id', id))
+
+// ---------- churrasco (lista de presença) ----------
+export const ultimoChurrasco = () =>
+  um(supabase.from('cond_eventos').select('*').eq('tipo', 'churrasco').order('criado_em', { ascending: false }).limit(1))
+export const criarChurrasco = (titulo, data) => um(supabase.from('cond_eventos').insert({ tipo: 'churrasco', titulo, data, aberta: true }).select())
+export const setChurrascoAberto = (id, aberta) => ok(supabase.from('cond_eventos').update({ aberta }).eq('id', id))
+export const listarPresencasEvento = (evento_id) => ok(supabase.from('cond_evento_presencas').select('*').eq('evento_id', evento_id))
+export async function setPresencaEvento(evento_id, atleta_id, status) {
+  if (!status) return ok(supabase.from('cond_evento_presencas').delete().match({ evento_id, atleta_id }))
+  return ok(supabase.from('cond_evento_presencas').upsert({ evento_id, atleta_id, status }))
+}
+
+// ---------- diretoria: quem é diretor ----------
+export const papeis = () => ok(supabase.rpc('cond_papeis'))
+export const definirPapel = (atleta_id, papel) => ok(supabase.rpc('cond_definir_papel', { p_atleta: atleta_id, p_papel: papel }))
