@@ -31,7 +31,7 @@ for _a in DB['cond_atletas']:
 FOTOS = []
 def eu_usuario(): return next((u for u in DB['cond_usuarios'] if u['email'] == SESSAO['email']), None)
 def meu_atleta(): u = eu_usuario(); return u and u.get('atleta_id')
-def sou_diretoria(): u = eu_usuario(); return bool(u and u.get('papel') == 'diretor')
+def sou_diretoria(): u = eu_usuario(); return bool(u and u.get('papel') == 'diretor' and not u.get('trocar_senha'))
 def rodada(i): return next((r for r in DB['cond_rodadas'] if r['id'] == i), {})
 # mesmas regras do banco (dados/permissoes-e-churrasco.sql)
 def conf_aberta(i): r = rodada(i); return bool(r.get('confirmacoes_abertas')) and r.get('status') != 'encerrada'

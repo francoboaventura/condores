@@ -434,6 +434,9 @@ async def main():
             await at.click('.churras button:has-text("Não vou")'); await at.wait_for_selector('.toast:has-text("fechada")')
             assert next(p for p in DB['cond_evento_presencas'] if p['atleta_id'] == idde('Ivan'))['status'] == 'S'
             # Lucas virou diretoria antes do primeiro acesso: mesmo assim cria a própria senha
+            # e, até trocar a senha, o banco não a trata como diretoria
+            como(EMAIL_ATLETA(idde('Lucas')))
+            from mock_supabase import sou_diretoria; assert not sou_diretoria()
             await at.click('header a:has-text("sair")'); await entrar_nome('Lucas', SENHA_PADRAO)
             await at.wait_for_selector('text=Bem-vindo, Lucas!'); assert await at.locator('text=Crie sua senha').count() == 1
             await at.fill('input[autocomplete=new-password] >> nth=0', 'lucas123'); await at.fill('input[autocomplete=new-password] >> nth=1', 'lucas123')
@@ -442,6 +445,7 @@ async def main():
             navs = await at.locator('nav button').all_inner_texts()
             assert len(navs) == 5 and any('Votação' in t for t in navs), navs
             assert 'diretoria' in await at.locator('header .usr').inner_text()
+            assert sou_diretoria()
             await actx.close()
 
             print('ERROS:', erros)

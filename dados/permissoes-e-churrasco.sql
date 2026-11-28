@@ -104,4 +104,11 @@ grant execute on function public.cond_evento_aberto(uuid) to authenticated;
 grant execute on function public.cond_definir_papel(uuid, text) to authenticated;
 grant execute on function public.cond_papeis() to authenticated;
 
+-- ---------- diretoria só vale depois de trocar a senha padrão ----------
+-- a senha padrão é de todos os atletas: conta promovida (ou com a senha devolvida à padrão) não age como
+-- diretoria até criar a própria senha. Mesma assinatura: a permissão de execução não muda.
+create or replace function public.cond_sou_diretoria()
+returns boolean language sql stable security definer set search_path = public
+as $$ select exists (select 1 from public.cond_usuarios where email = lower(auth.jwt()->>'email') and papel = 'diretor' and not coalesce(trocar_senha, false)) $$;
+
 notify pgrst, 'reload schema';
